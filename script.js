@@ -13,6 +13,7 @@ class Entity {
         this.addButton = this.createAddButton();
         this.connectionPoints = [];
         this.setConnectionPoints();
+        this.hasPrimaryAttribute = false;
     }
 
     isPointInEntity(px, py) {
@@ -34,24 +35,29 @@ class Entity {
             stroke: 'black', 
             'stroke-width': '1' 
         });
-
+    
         this.text = this.createSVGElement('text', { 
             x: this.geometry.width / 2, 
-            y: 15, 
+            y: -5,
             'dominant-baseline': 'middle', 
             'text-anchor': 'middle', 
             fill: 'black', 
             'font-size': '14' 
         });
         this.text.textContent = this.label;
-
-        entityGroup.appendChild(this.rect);
+    
         entityGroup.appendChild(this.text);
-        this.graph.container.appendChild(entityGroup);
+        entityGroup.appendChild(this.rect);
 
+        this.identifierGroup = this.createSVGElement('g', { class: 'identifiers' });
+        this.attributeGroup = this.createSVGElement('g', { class: 'attributes' });
+        entityGroup.appendChild(this.identifierGroup);
+        entityGroup.appendChild(this.attributeGroup);
+        this.graph.container.appendChild(entityGroup);
+    
         return entityGroup;
     }
-
+    
     createSVGElement(tag, attributes) {
         const element = document.createElementNS('http://www.w3.org/2000/svg', tag);
         Object.entries(attributes).forEach(([key, value]) => element.setAttribute(key, value));
@@ -141,13 +147,44 @@ class Entity {
         this.geometry.height = newHeight;
         this.rect.setAttribute('height', newHeight);
         this.resizeHandle.setAttribute('y', newHeight - 10);
+        this.updateResizeHandlePosition();
         this.updateAttributePositions();
     }
-
+    
     updateAttributeWidth(newWidth) {
         const attributeRects = this.element.querySelectorAll('.table-cell');
         attributeRects.forEach(attributeRect => attributeRect.setAttribute('width', newWidth));
     }
+    
+    updateResizeHandlePosition() {
+        this.resizeHandle.setAttribute('x', this.geometry.width - 10);
+        this.resizeHandle.setAttribute('y', this.geometry.height - 10);
+    }
+
+    updateAttributePositions() {
+        const attributeRects = this.element.querySelectorAll('.table-cell');
+    
+        const attributeCount = attributeRects.length;
+    
+        if (attributeCount === 0) return;
+    
+        const totalHeight = this.geometry.height;
+        const heightPerAttribute = totalHeight / attributeCount; 
+    
+        attributeRects.forEach((attributeRect, index) => {
+            const newYPos = heightPerAttribute * index; 
+            attributeRect.setAttribute('y', newYPos);
+            attributeRect.setAttribute('height', heightPerAttribute); 
+    
+            const text = attributeRect.nextElementSibling;
+            if (text) {
+                text.setAttribute('y', newYPos + heightPerAttribute / 2); 
+            }
+        });
+    
+        this.resizeHandle.setAttribute('y', totalHeight - 10);
+    }
+    
 
     stopResizing() {
         this.graph.isResizing = false;
@@ -157,84 +194,65 @@ class Entity {
 
     updateTextPosition() {
         this.text.setAttribute('x', this.geometry.width / 2);
-        this.text.setAttribute('y', 15);
+        this.text.setAttribute('y', -5);
     }
 
+    handleAddButtonClick(event) {
+        event.stopPropagation();
+        this.showAddAttributePrompt();
+    }
+    
     showAddAttributePrompt() {
         const attributeName = prompt("Enter attribute name:");
         if (attributeName) {
-            this.addElement(attributeName);
+            const isIdentifier = confirm("Is this an identifier?");
+            this.addElement(attributeName, isIdentifier);
         }
     }
 
-    addElement(name) {
-        this.attributes.push(name);
-        const yPos = this.geometry.height;
+    addElement(name, isIdentifier = false) {
+        this.attributes.push({ name, isIdentifier });
+    
+        const attributeCount = this.attributes.length;
+        const heightPerAttribute = this.geometry.height / attributeCount;
+        
+        const yPos = heightPerAttribute * (attributeCount - 1);
     
         const attributeRect = this.createSVGElement('rect', {
             class: 'table-cell',
             width: this.geometry.width,
-            height: '30',
+            height: heightPerAttribute, 
             y: yPos,
             fill: 'lightgreen',
             stroke: 'black',
             'stroke-width': '1'
         });
-        this.element.appendChild(attributeRect);
-    
+        
         const text = this.createSVGElement('text', {
-            x: '5', 
-            y: yPos + 20, 
+            x: '5',
+            y: yPos + heightPerAttribute / 2, 
             fill: 'black',
-            'font-size': '12', 
-            'text-anchor': 'start' 
+            'font-size': '12',
+            'text-anchor': 'start'
         });
-        text.textContent = name; 
-        this.element.appendChild(text);
+        text.textContent = name;
     
-        this.geometry.height += 30;
+        if (isIdentifier) {
+            this.identifierGroup.appendChild(attributeRect);
+            this.identifierGroup.appendChild(text);
+        } else {
+            this.attributeGroup.appendChild(attributeRect);
+            this.attributeGroup.appendChild(text);
+        }
+    
+        this.geometry.height = heightPerAttribute * attributeCount;  
         this.rect.setAttribute('height', this.geometry.height);
         this.updateResizeHandlePosition();
         this.element.appendChild(this.resizeHandle);
-        this.updateLastAttributePosition();
+    
+        this.updateAttributePositions();
     }
     
-
-    updateResizeHandlePosition() {
-        this.resizeHandle.setAttribute('x', this.geometry.width - 10);
-        this.resizeHandle.setAttribute('y', this.geometry.height - 10);
-    }
-
-    updateLastAttributePosition() {
-        const attributeRects = this.element.querySelectorAll('.table-cell');
-        const lastAttribute = attributeRects[attributeRects.length - 1];
-
-        if (lastAttribute) {
-            const lastYPos = this.geometry.height - 30;
-            lastAttribute.setAttribute('y', lastYPos);
-            const text = lastAttribute.nextElementSibling;
-            if (text) {
-                text.setAttribute('y', lastYPos + 20);
-            }
-        }
-    }
-
-    updateAttributePositions() {
-        const attributeRects = this.element.querySelectorAll('.table-cell');
-
-        attributeRects.forEach((attributeRect, index) => {
-            const newYPos = this.geometry.height - (30 * (attributeRects.length - index));
-            attributeRect.setAttribute('y', newYPos);
-
-            const text = attributeRect.nextElementSibling;
-            if (text) {
-                text.setAttribute('y', newYPos + 20);
-            }
-        });
-
-        this.resizeHandle.setAttribute('y', this.geometry.height - 10);
-    }
-
     showButton() {
         const { x, y } = this.geometry;
         this.addButton.style.left = `${x + this.geometry.width}px`;
@@ -737,3 +755,4 @@ document.getElementById('addEdgeButton').addEventListener('click', () => {
 
     graphHandler.addEdgeStandalone(randomX1, randomY1, randomX2, randomY2);
 });
+
