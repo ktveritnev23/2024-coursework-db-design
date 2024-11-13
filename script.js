@@ -1,8 +1,10 @@
 class Entity {
-    constructor(graph, name, x, y, width, height) {
+    constructor(graph, name, x, y, width, height, isStrong) {
         this.graph = graph;
         this.geometry = { x, y, width, height };
         this.label = name || 'New Entity';
+        this.isStrong = isStrong; 
+        this.initialFillColor = this.isStrong ? '#77dd77' : '#ffc26c';
         this.element = this.createEntityElement();
         this.attributes = [];
         this.selected = false;
@@ -10,12 +12,10 @@ class Entity {
 
         this.element.appendChild(this.resizeHandle);
         this.initEvents();
-        this.addButton = this.createAddButton();
         this.connectionPoints = [];
         this.setConnectionPoints();
         this.hasPrimaryAttribute = false;
     }
-
     isPointInEntity(px, py) {
         return (
             px >= this.geometry.x &&
@@ -31,7 +31,7 @@ class Entity {
         this.rect = this.createSVGElement('rect', { 
             width: this.geometry.width, 
             height: this.geometry.height, 
-            fill: 'lightblue', 
+            fill: this.initialFillColor, 
             stroke: 'black', 
             'stroke-width': '1' 
         });
@@ -75,22 +75,7 @@ class Entity {
         event.stopPropagation();
     }
 
-    createAddButton() {
-        const button = document.createElement('button');
-        button.textContent = '+';
-        button.style.position = 'absolute';
-        button.style.display = 'none';
-        button.style.cursor = 'pointer';
-        button.addEventListener('click', (event) => this.handleAddButtonClick(event));
-        document.body.appendChild(button);
-        return button;
-    }
-
-    handleAddButtonClick(event) {
-        event.stopPropagation();
-        this.showAddAttributePrompt();
-    }
-
+   
     createResizeHandle() {
         return this.createSVGElement('rect', {
             width: '10',
@@ -193,75 +178,59 @@ class Entity {
     }
 
     updateTextPosition() {
+        this.text.textContent = this.label;
         this.text.setAttribute('x', this.geometry.width / 2);
         this.text.setAttribute('y', -5);
     }
 
     handleAddButtonClick(event) {
         event.stopPropagation();
-        this.showAddAttributePrompt();
     }
-    
-    showAddAttributePrompt() {
-        const attributeName = prompt("Enter attribute name:");
-        if (attributeName) {
-            const isIdentifier = confirm("Is this an identifier?");
-            this.addElement(attributeName, isIdentifier);
-        }
-    }
-
+ 
     addElement(name, isIdentifier = false) {
         this.attributes.push({ name, isIdentifier });
-    
-        const attributeCount = this.attributes.length;
-        const heightPerAttribute = this.geometry.height / attributeCount;
-        
-        const yPos = heightPerAttribute * (attributeCount - 1);
-    
-        const attributeRect = this.createSVGElement('rect', {
-            class: 'table-cell',
-            width: this.geometry.width,
-            height: heightPerAttribute, 
-            y: yPos,
-            fill: 'lightgreen',
-            stroke: 'black',
-            'stroke-width': '1'
-        });
-        
-        const text = this.createSVGElement('text', {
-            x: '5',
-            y: yPos + heightPerAttribute / 2, 
-            fill: 'black',
-            'font-size': '12',
-            'text-anchor': 'start'
-        });
-        text.textContent = name;
-    
-        if (isIdentifier) {
-            this.identifierGroup.appendChild(attributeRect);
-            this.identifierGroup.appendChild(text);
-        } else {
-            this.attributeGroup.appendChild(attributeRect);
-            this.attributeGroup.appendChild(text);
-        }
-    
-        this.geometry.height = heightPerAttribute * attributeCount;  
-        this.rect.setAttribute('height', this.geometry.height);
-        this.updateResizeHandlePosition();
-        this.element.appendChild(this.resizeHandle);
-    
-        this.updateAttributePositions();
-    }
-    
-    showButton() {
-        const { x, y } = this.geometry;
-        this.addButton.style.left = `${x + this.geometry.width}px`;
-        this.addButton.style.top = `${y}px`;
-        this.addButton.style.display = 'block';
+        this.updateAttributesOnCanvas();
     }
 
-    hideButton() {
-        this.addButton.style.display = 'none';
+    updateAttributesOnCanvas() {
+        this.identifierGroup.innerHTML = '';
+        this.attributeGroup.innerHTML = '';
+
+        const heightPerAttribute = this.geometry.height / (this.attributes.length || 1);
+        
+        this.attributes.forEach((attr, index) => {
+            const yPos = heightPerAttribute * index;
+            const attributeRect = this.createSVGElement('rect', {
+                class: 'table-cell',
+                width: this.geometry.width,
+                height: heightPerAttribute, 
+                y: yPos,
+                fill: this.initialFillColor,
+                stroke: 'black',
+                'stroke-width': '1'
+            });
+            
+            const text = this.createSVGElement('text', {
+                x: '5',
+                y: yPos + heightPerAttribute / 2, 
+                fill: 'black',
+                'font-size': '12',
+                'text-anchor': 'start'
+            });
+            text.textContent = attr.name;
+
+            if (attr.isIdentifier) {
+                this.identifierGroup.appendChild(attributeRect);
+                this.identifierGroup.appendChild(text);
+            } else {
+                this.attributeGroup.appendChild(attributeRect);
+                this.attributeGroup.appendChild(text);
+            }
+        });
+
+        this.geometry.height = heightPerAttribute * this.attributes.length;  
+        this.rect.setAttribute('height', this.geometry.height);
+        this.updateResizeHandlePosition();
     }
 
     setConnectionPoints() {
@@ -399,7 +368,6 @@ class GraphHandler {
         this.selectedEntity.geometry.x = newX;
         this.selectedEntity.geometry.y = newY;
         this.selectedEntity.element.setAttribute('transform', `translate(${newX}, ${newY})`);
-        this.selectedEntity.showButton();
     }
 }
 
@@ -414,6 +382,7 @@ class SelectionModel {
         this.selectedElement = entity;
         this.highlightSelection(entity);
         this.showResizeHandle(entity);
+        displaySelectedEntityData(entity);
     }
 
     selectEdge(edge) {
@@ -434,11 +403,11 @@ class SelectionModel {
         } else if (element instanceof Edge) {
             element.deselect();
         }
+        clearSelectedEntityData();
     }
 
     clearEntitySelection(entity) {
-        entity.rect.setAttribute('fill', 'lightblue');
-        entity.hideButton();
+        entity.rect.setAttribute('stroke', 'black'); 
         this.hideResizeHandle(entity);
     }
 
@@ -459,8 +428,7 @@ class SelectionModel {
     }
 
     highlightEntitySelection(entity) {
-        entity.rect.setAttribute('fill', 'yellow');
-        entity.showButton();
+        entity.rect.setAttribute('stroke', 'red'); 
     }
 
     deselect() {
@@ -723,8 +691,207 @@ class Edge {
 }
 
 
-//////////////// пример работы /////////////////
 const svgContainer = document.getElementById('svgContainer');
+const graphHandler = new GraphHandler(svgContainer);
+
+let identifiers = [];
+let attributes = [];
+
+document.getElementById('addEntityButton').addEventListener('click', () => {
+    const entityOptions = document.getElementById('entityOptions');
+    entityOptions.style.display = entityOptions.style.display === 'none' ? 'block' : 'none';
+    identifiers = [];
+    attributes = [];
+    updateIdentifiersList();
+    updateAttributesList();
+    resetEntityForm();
+});
+
+// Добавить идентификатор
+document.getElementById('addIdentifierButton').addEventListener('click', () => {
+    const identifierInput = document.getElementById('identifierInput');
+    const identifier = identifierInput.value.trim();
+    if (identifier) {
+        identifiers.push(identifier);
+        identifierInput.value = '';
+        updateIdentifiersList();
+    }
+});
+
+// Добавить атрибут
+document.getElementById('addAttributeButton').addEventListener('click', () => {
+    const attributeInput = document.getElementById('attributeInput');
+    const attribute = attributeInput.value.trim();
+    if (attribute) {
+        attributes.push(attribute);
+        attributeInput.value = '';
+        updateAttributesList();
+    }
+});
+
+// Обновить отображение идентификаторов
+function updateIdentifiersList() {
+    const identifiersList = document.getElementById('identifiersList');
+    identifiersList.innerHTML = '';
+    identifiers.forEach(identifier => {
+        const item = document.createElement('div');
+        item.textContent = identifier;
+        identifiersList.appendChild(item);
+    });
+}
+
+// Обновить отображение атрибутов
+function updateAttributesList() {
+    const attributesList = document.getElementById('attributesList');
+    attributesList.innerHTML = '';
+    attributes.forEach(attribute => {
+        const item = document.createElement('div');
+        item.textContent = attribute;
+        attributesList.appendChild(item);
+    });
+}
+
+// Создать сущность 
+document.getElementById('createEntityButton').addEventListener('click', () => {
+    const selectedType = document.querySelector('input[name="entityType"]:checked').value;
+    const isStrong = selectedType === 'strong';
+    const entityName = document.getElementById('entityNameInput').value || 'New Entity';
+
+    const centerX = svgContainer.clientWidth / 2;
+    const centerY = svgContainer.clientHeight / 2;
+    const newEntity = new Entity(graphHandler, entityName, centerX - 60, centerY - 30, 120, 60, isStrong);
+    
+    identifiers.forEach(id => newEntity.addElement(id, true));
+    attributes.forEach(attr => newEntity.addElement(attr, false));
+    
+    graphHandler.addEntity(newEntity);
+
+    // Скрыть меню 
+    document.getElementById('entityOptions').style.display = 'none';
+    identifiers = [];
+    attributes = [];
+    updateIdentifiersList();
+    updateAttributesList();
+});
+
+
+let selectedEntity = null;
+
+// Отобразить данные выбранной сущности на панели
+function displaySelectedEntityData(entity) {
+    selectedEntity = entity;
+    const selectedEntityData = document.getElementById('selectedEntityData');
+    selectedEntityData.style.display = 'block';
+
+    const entityNameInput = document.getElementById('selectedEntityNameInput');
+    entityNameInput.value = entity.label;
+    entityNameInput.addEventListener('input', (event) => {
+        selectedEntity.label = event.target.value;
+        selectedEntity.updateTextPosition();
+    });
+
+    const selectedIdentifiersList = document.getElementById('selectedIdentifiersList');
+    const selectedAttributesList = document.getElementById('selectedAttributesList');
+    selectedIdentifiersList.innerHTML = '<h5>Identifiers</h5>';
+    selectedAttributesList.innerHTML = '<h5>Attributes</h5>';
+
+    entity.attributes.forEach((attr, index) => {
+        if (attr.isIdentifier) {
+            const item = createEditableItem(attr.name, (newName) => {
+                entity.attributes[index].name = newName;
+                entity.updateAttributesOnCanvas();
+            });
+            selectedIdentifiersList.appendChild(item);
+        }
+    });
+
+    entity.attributes.forEach((attr, index) => {
+        if (!attr.isIdentifier) {
+            const item = createEditableItem(attr.name, (newName) => {
+                entity.attributes[index].name = newName;
+                entity.updateAttributesOnCanvas(); 
+            });
+            selectedAttributesList.appendChild(item);
+        }
+    });
+}
+
+function createEditableItem(value, onSave) {
+    const container = document.createElement('div');
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = value;
+
+    input.addEventListener('input', () => {
+        onSave(input.value);
+    });
+
+    container.appendChild(input);
+    return container;
+}
+
+
+// Добавление новых идентификаторов и атрибутов из панели
+document.getElementById('addNewIdentifierButton').addEventListener('click', () => {
+    const newIdentifierInput = document.getElementById('newIdentifierInput');
+    const newIdentifier = newIdentifierInput.value.trim();
+    if (newIdentifier && selectedEntity) {
+        selectedEntity.addElement(newIdentifier, true);
+        displaySelectedEntityData(selectedEntity);
+        newIdentifierInput.value = '';
+    }
+});
+
+document.getElementById('addNewAttributeButton').addEventListener('click', () => {
+    const newAttributeInput = document.getElementById('newAttributeInput');
+    const newAttribute = newAttributeInput.value.trim();
+    if (newAttribute && selectedEntity) {
+        selectedEntity.addElement(newAttribute, false);
+        displaySelectedEntityData(selectedEntity);
+        newAttributeInput.value = '';
+    }
+});
+
+document.getElementById('selectedEntityNameInput').addEventListener('input', (event) => {
+    if (selectedEntity) {
+        selectedEntity.label = event.target.value;
+        selectedEntity.updateTextPosition(); 
+    }
+});
+
+
+function resetEntityForm() {
+    document.getElementById('identifiersList').innerHTML = '';
+    document.getElementById('attributesList').innerHTML = '';
+    document.getElementById('identifierInput').value = '';
+    document.getElementById('attributeInput').value = '';
+    document.getElementById('entityNameInput').value = ''; 
+}
+
+// Очистка панели
+function clearSelectedEntityData() {
+    selectedEntity = null;
+    document.getElementById('selectedEntityData').style.display = 'none';
+    document.getElementById('selectedIdentifiersList').innerHTML = '';
+    document.getElementById('selectedAttributesList').innerHTML = '';
+}
+
+document.getElementById('addEdgeButton').addEventListener('click', () => {
+    const svgWidth = svgContainer.clientWidth;
+    const svgHeight = svgContainer.clientHeight;
+
+    const randomX1 = Math.floor(Math.random() * svgWidth);
+    const randomY1 = Math.floor(Math.random() * svgHeight);
+    const randomX2 = Math.floor(Math.random() * svgWidth);
+    const randomY2 = Math.floor(Math.random() * svgHeight);
+
+    graphHandler.addEdgeStandalone(randomX1, randomY1, randomX2, randomY2);
+});
+
+
+
+//////////////// пример работы /////////////////
+/*const svgContainer = document.getElementById('svgContainer');
 const graphHandler = new GraphHandler(svgContainer);
 
 const entity1 = new Entity(graphHandler, 'Entity1', 400, 30, 50, 50);
@@ -756,3 +923,4 @@ document.getElementById('addEdgeButton').addEventListener('click', () => {
     graphHandler.addEdgeStandalone(randomX1, randomY1, randomX2, randomY2);
 });
 
+*/

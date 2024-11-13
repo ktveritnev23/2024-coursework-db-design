@@ -1,21 +1,58 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ER Model Editor</title>
-    <style>
-        #svgContainer {
-            border: 1px solid black;
-            width: 100%;
-            height: 600px;
-        }
-    </style>
+    <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
-    <button id="addEntityButton">Add Entity</button>
-    <button id="addEdgeButton">Add Edge</button>
+    <div class="sidebar">
+        <button id="addEntityButton">Add Entity</button>
+        <!-- Параметры сущности--> 
+        <div id="entityOptions" style="display: none;">
+            <input type="text" id="entityNameInput" placeholder="Enter entity name">
+
+            <div class="entity-type-options">
+                <label><input type="radio" name="entityType" value="strong" checked> Strong Entity</label>
+                <label><input type="radio" name="entityType" value="weak"> Weak Entity</label>
+            </div>
+
+            <h4>Identifiers</h4>
+            <div id="identifiersList"></div>
+            <input type="text" id="identifierInput" placeholder="Enter identifier">
+            <button id="addIdentifierButton">Add Identifier</button>
+
+            <h4>Attributes</h4>
+            <div id="attributesList"></div>
+            <input type="text" id="attributeInput" placeholder="Enter attribute">
+            <button id="addAttributeButton">Add Attribute</button>
+
+            <button id="createEntityButton">Create Entity</button>
+        </div>
+
+        <div class="separator"></div>
+        <button id="addEdgeButton">Add Edge</button>
+
+        <!-- Параметры выбранной сущности -->
+        <div id="selectedEntityData" style="display: none;">
+            <input type="text" id="selectedEntityNameInput" placeholder="Entity name">
+        
+            <div id="selectedIdentifiersList"></div>
+            <input type="text" id="newIdentifierInput" placeholder="Enter new identifier">
+            <button id="addNewIdentifierButton" class="addButton">Add New Identifier</button>
+            
+            <div id="selectedAttributesList"></div>
+            <input type="text" id="newAttributeInput" placeholder="Enter new attribute">
+            <button id="addNewAttributeButton" class="addButton">Add New Attribute</button>
+    
+        </div>
+    </div>
+
     <svg id="svgContainer"></svg>
     <script src="script.js"></script>
 </body>
+
 </html>
