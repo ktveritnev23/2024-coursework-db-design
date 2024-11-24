@@ -236,27 +236,52 @@ class Entity {
     setConnectionPoints() {
         const { x, y, width, height } = this.geometry;
         this.connectionPoints = [
-            { x: x + width / 5, y: y },
+            { x: x + width / 2, y: y },
             { x: x + width / 2, y: y + height },
             { x: x, y: y + height / 2 },
             { x: x + width, y: y + height / 2 }
         ];
     }
-
-    findClosestConnectionPoint(targetEntity) {
-        this.setConnectionPoints();
-
-        const targetCenterX = targetEntity.geometry.x + targetEntity.geometry.width / 2;
-        const targetCenterY = targetEntity.geometry.y + targetEntity.geometry.height / 2;
-
-        return this.connectionPoints.reduce((closestPoint, point) => {
-            const distance = this.calculateDistance(point, { x: targetCenterX, y: targetCenterY });
-            if (distance < closestPoint.distance) {
-                return { point, distance };
-            }
-            return closestPoint;
-        }, { point: null, distance: Infinity }).point;
+    getConnectionPointSide(connectionPoint) {
+        const { x, y } = connectionPoint;
+        const { x: entityX, y: entityY, width, height } = this.geometry;
+        const tolerance = 1;
+    
+        if (Math.abs(x - entityX) <= tolerance) {
+            return 0; 
+        } else if (Math.abs(x - (entityX + width)) <= tolerance) {
+            return 1; 
+        } else if (Math.abs(y - entityY) <= tolerance) {
+            return 2; 
+        } else if (Math.abs(y - (entityY + height)) <= tolerance) {
+            return 3; 
+        }
+    
+        console.warn("Connection point is out of bounds:", connectionPoint);
+        return -1;
     }
+    
+    findClosestConnectionPoints(targetEntity) {
+        this.setConnectionPoints();
+        targetEntity.setConnectionPoints();
+        console.log("targetEntity connectionPoints in findMethod", targetEntity.connectionPoints);
+        let minDistance = Infinity;
+        let closestPoints = { start: null, end: null };
+    
+        for (const point1 of this.connectionPoints) {
+            for (const point2 of targetEntity.connectionPoints) {
+                const distance = this.calculateDistance(point1, point2);
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    closestPoints.start = point1;
+                    closestPoints.end = point2;
+                }
+            }
+        }
+    
+        return closestPoints; 
+    }
+    
 
     calculateDistance(point1, point2) {
         const dx = point1.x - point2.x;
@@ -275,8 +300,6 @@ class Entity {
         return null;
     }
 }
-
-
 
 class GraphHandler {
     constructor(container) {
@@ -297,7 +320,125 @@ class GraphHandler {
         document.addEventListener('mouseup', () => this.onMouseUp());
         this.container.addEventListener('click', () => this.selectionModel.deselect());
     }
+    logCells() {
+        console.log(`Total entities in the graph: ${this.cells.length}`);
+        // this.cells.forEach((entity, index) => {
+        //     console.log(`Entity ${index + 1}:`);
+        //     console.log(`Name: ${entity.label}`);
+        //     console.log(`Position: (${entity.geometry.x}, ${entity.geometry.y})`);
+        //     console.log(`Size: ${entity.geometry.width}x${entity.geometry.height}`);
+        //     console.log(`Is Strong: ${entity.isStrong}`);
+        //     console.log(`Attributes: ${entity.attributes.map(attr => attr.name).join(', ')}`);
+        //     console.log(`Identifiers: ${entity.attributes.filter(attr => attr.isIdentifier).map(attr => attr.name).join(', ')}`);
+        // });
+    }
+    saveGraphState() {
+    const graphState = {
+        entities: this.cells.map(entity => this.serializeEntity(entity)),
+        edges: this.edges.map(edge => this.serializeEdge(edge))
+    };
 
+    const jsonString = JSON.stringify(graphState, null, 2);
+    
+    const blob = new Blob([jsonString], { type: 'application/json' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'graphState.json';
+    link.click();
+}
+
+serializeEntity(entity) {
+    return {
+        name: entity.label,
+        x: entity.geometry.x,
+        y: entity.geometry.y,
+        width: entity.geometry.width,
+        height: entity.geometry.height,
+        isStrong: entity.isStrong,
+        attributes: entity.attributes.filter(attr => !attr.isIdentifier).map(attr => attr.name), // Only regular attributes
+        identifiers: entity.attributes.filter(attr => attr.isIdentifier).map(attr => attr.name) // Only identifiers
+    };
+}
+
+serializeEdge(edge) {
+    const pointsString = edge.element.getAttribute('points');
+    const pointsArray = pointsString.split(' ').map(point => {
+        const [x, y] = point.split(',');
+        return { x: parseFloat(x), y: parseFloat(y) };
+    });
+
+    return {
+        isStandalone: edge.isStandalone,
+        entity1: edge.entity1 ? edge.entity1.label : null,
+        entity2: edge.entity2 ? edge.entity2.label : null,
+        points: pointsArray 
+    };
+}
+
+
+loadState(file) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            const graphState = JSON.parse(e.target.result);
+            this.cells = [];
+            this.edges = [];
+
+            graphState.entities.forEach(entityData => {
+                const entity = new Entity(
+                    this, 
+                    entityData.name, 
+                    entityData.x, 
+                    entityData.y, 
+                    entityData.width, 
+                    entityData.height, 
+                    entityData.isStrong
+                );
+
+                if (entityData.identifiers.length > 0) {
+                    entityData.identifiers.forEach(identifier => {
+                        entity.addElement(identifier, true);
+                    });
+                }
+
+                if (entityData.attributes.length > 0) {
+                    entityData.attributes.forEach(attribute => {
+                        entity.addElement(attribute, false);
+                    });
+                }
+
+                this.cells.push(entity);
+                this.container.appendChild(entity.element);
+            });
+
+            graphState.edges.forEach(edgeData => {
+                let entity1 = null, entity2 = null;
+
+                if (edgeData.entity1) {
+                    entity1 = this.cells.find(e => e.label === edgeData.entity1);
+                }
+                if (edgeData.entity2) {
+                    entity2 = this.cells.find(e => e.label === edgeData.entity2);
+                }
+
+                const edge = new Edge(this, entity1, entity2, edgeData.isStandalone);
+
+                edge.element.setAttribute('points', edgeData.points.map(p => `${p.x},${p.y}`).join(' '));
+                edge.updateHandles();
+
+                this.container.appendChild(edge.element);
+                this.container.appendChild(edge.handle1);
+                this.container.appendChild(edge.handle2);
+
+                this.edges.push(edge);
+            });
+            this.logCells();
+        } catch (err) {
+            console.error('error:', err);
+        }
+    };
+    reader.readAsText(file);
+}
     onMouseMove(event) {
         if (this.isDragging) {
             this.moveEntity(event);
@@ -311,6 +452,7 @@ class GraphHandler {
 
     addEntity(entity) {
         this.cells.push(entity);
+        this.logCells()
     }
 
     addEdge(entity1, entity2) {
@@ -439,7 +581,6 @@ class SelectionModel {
     }
 }
 
-
 class Edge {
     constructor(graph, entity1 = null, entity2 = null, isStandalone = false) {
         this.graph = graph;
@@ -468,10 +609,11 @@ class Edge {
     }
 
     createEdgeElement() {
-        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-        line.setAttribute('stroke', 'black');
-        line.setAttribute('stroke-width', '1');
-        return line;
+        const polyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+        polyline.setAttribute('stroke', 'black');
+        polyline.setAttribute('stroke-width', '1');
+        polyline.setAttribute('fill', 'none');
+        return polyline;
     }
 
     createHandle() {
@@ -484,19 +626,117 @@ class Edge {
     }
 
     setStandalonePosition(x1, y1, x2, y2) {
-        this.element.setAttribute('x1', x1);
-        this.element.setAttribute('y1', y1);
-        this.element.setAttribute('x2', x2);
-        this.element.setAttribute('y2', y2);
+        const points = this.createPolylinePath({ x: x1, y: y1 }, { x: x2, y: y2 });
+        this.element.setAttribute('points', points);
         this.updateHandles();
         this.updateAppearance();
     }
 
+    createPolylinePath(start, end) {
+        const points = [];
+    
+        if (!this.entity1 && !this.entity2) {
+            const deltaX = Math.abs(start.x - end.x);
+            const deltaY = Math.abs(start.y - end.y);
+    
+            if (deltaX > deltaY) {
+                const middleX = (start.x + end.x) / 2;
+                points.push(
+                    { x: start.x, y: start.y },
+                    { x: middleX, y: start.y },
+                    { x: middleX, y: end.y },
+                    { x: end.x, y: end.y }
+                );
+            } else {
+                const middleY = (start.y + end.y) / 2;
+                points.push(
+                    { x: start.x, y: start.y },
+                    { x: start.x, y: middleY },
+                    { x: end.x, y: middleY },
+                    { x: end.x, y: end.y }
+                );
+            }
+        } else if (this.entity1 && !this.entity2) {
+            const side = this.entity1.getConnectionPointSide(start)
+            const middleX = (start.x + end.x) / 2;
+            const middleY = (start.y + end.y) / 2;
+            if (side == 0 || side == 1) {
+                points.push(
+                    { x: start.x, y: start.y },
+                    { x: middleX, y: start.y },
+                    { x: middleX, y: end.y },
+                    { x: end.x, y: end.y }
+                );
+            } else {
+                points.push(
+                    { x: start.x, y: start.y },
+                    { x: start.x, y: middleY },
+                    { x: end.x, y: middleY },
+                    { x: end.x, y: end.y }
+                );
+            }
+        } else if (!this.entity1 && this.entity2) {
+            console.log("entity2 существует")
+            const side = this.entity2.getConnectionPointSide(end)
+            console.log("end",end)
+            console.log(side)
+    
+            const middleX = (start.x + end.x) / 2;
+            const middleY = (start.y + end.y) / 2;
+           
+            if (side == 0 || side == 1) {
+                points.push(
+                    { x: start.x, y: start.y },
+                    { x: middleX, y: start.y },
+                    { x: middleX, y: end.y },
+                    { x: end.x, y: end.y }
+                );
+            } else {
+                points.push(
+                    { x: start.x, y: start.y },
+                    { x: start.x, y: middleY },
+                    { x: end.x, y: middleY },
+                    { x: end.x, y: end.y }
+                );
+            }
+
+        } else {
+            const side1 = this.entity1.getConnectionPointSide(start);
+            const side2 = this.entity2.getConnectionPointSide(end);
+            const middleX = (start.x + end.x) / 2;
+            const middleY = (start.y + end.y) / 2;
+            if ((side1 === 0 || side1 === 1) && (side2 === 0 || side2 === 1)) {
+                points.push(
+                    { x: start.x, y: start.y },
+                    { x: middleX, y: start.y },
+                    { x: middleX, y: end.y },
+                    { x: end.x, y: end.y }
+                );
+            } else if ((side1 === 2 || side1 === 3) && (side2 === 2 || side2 === 3)) {
+                points.push(
+                    { x: start.x, y: start.y },
+                    { x: start.x, y: middleY },
+                    { x: end.x, y: middleY },
+                    { x: end.x, y: end.y }
+                );
+            } else {
+                points.push(
+                    { x: start.x, y: start.y },
+                    { x: start.x, y: end.y },
+                    { x: end.x, y: end.y },
+                    { x: end.x, y: end.y }
+                );
+            }
+        }
+        return points.map(p => `${p.x},${p.y}`).join(' ');
+    }
+    
     updateHandles() {
-        const x1 = parseFloat(this.element.getAttribute('x1'));
-        const y1 = parseFloat(this.element.getAttribute('y1'));
-        const x2 = parseFloat(this.element.getAttribute('x2'));
-        const y2 = parseFloat(this.element.getAttribute('y2'));
+        const points = this.element.getAttribute('points').split(' ');
+        const x1 = parseFloat(points[0].split(',')[0]);
+        const y1 = parseFloat(points[0].split(',')[1]);
+        const x2 = parseFloat(points[3].split(',')[0]);
+        const y2 = parseFloat(points[3].split(',')[1]);
 
         this.handle1.setAttribute('cx', x1);
         this.handle1.setAttribute('cy', y1);
@@ -541,10 +781,10 @@ class Edge {
         const dx = event.clientX - this.dragStart.x;
         const dy = event.clientY - this.dragStart.y;
 
-        const newX1 = parseFloat(this.element.getAttribute('x1')) + dx;
-        const newY1 = parseFloat(this.element.getAttribute('y1')) + dy;
-        const newX2 = parseFloat(this.element.getAttribute('x2')) + dx;
-        const newY2 = parseFloat(this.element.getAttribute('y2')) + dy;
+        const newX1 = parseFloat(this.element.getAttribute('points').split(' ')[0].split(',')[0]) + dx;
+        const newY1 = parseFloat(this.element.getAttribute('points').split(' ')[0].split(',')[1]) + dy;
+        const newX2 = parseFloat(this.element.getAttribute('points').split(' ')[3].split(',')[0]) + dx;
+        const newY2 = parseFloat(this.element.getAttribute('points').split(' ')[3].split(',')[1]) + dy;
 
         this.setStandalonePosition(newX1, newY1, newX2, newY2);
         this.dragStart = { x: event.clientX, y: event.clientY };
@@ -555,14 +795,19 @@ class Edge {
         const newY = event.clientY;
 
         if (this.draggingHandle === this.handle1) {
+            console.log("поинтс", newX,newY,parseFloat(this.element.getAttribute('points').split(' ')[3].split(',')[0]), parseFloat(this.element.getAttribute('points').split(' ')[3].split(',')[1]))
             this.setStandalonePosition(newX, newY,
-                parseFloat(this.element.getAttribute('x2')),
-                parseFloat(this.element.getAttribute('y2')));
+                parseFloat(this.element.getAttribute('points').split(' ')[3].split(',')[0]),
+                parseFloat(this.element.getAttribute('points').split(' ')[3].split(',')[1]));
+             this.updatePosition()
+            console.log("handle1")
         } else if (this.draggingHandle === this.handle2) {
             this.setStandalonePosition(
-                parseFloat(this.element.getAttribute('x1')),
-                parseFloat(this.element.getAttribute('y1')),
+                parseFloat(this.element.getAttribute('points').split(' ')[0].split(',')[0]),
+                parseFloat(this.element.getAttribute('points').split(' ')[0].split(',')[1]),
                 newX, newY);
+            this.updatePosition()
+            console.log("handle2")
         }
     }
 
@@ -578,11 +823,11 @@ class Edge {
 
     handleConnectionPoints() {
         const freeEndX = this.draggingHandle === this.handle1
-            ? parseFloat(this.element.getAttribute('x1'))
-            : parseFloat(this.element.getAttribute('x2'));
+            ? parseFloat(this.element.getAttribute('points').split(' ')[0].split(',')[0])
+            : parseFloat(this.element.getAttribute('points').split(' ')[3].split(',')[0]);
         const freeEndY = this.draggingHandle === this.handle1
-            ? parseFloat(this.element.getAttribute('y1'))
-            : parseFloat(this.element.getAttribute('y2'));
+            ? parseFloat(this.element.getAttribute('points').split(' ')[0].split(',')[1])
+            : parseFloat(this.element.getAttribute('points').split(' ')[3].split(',')[1]);
 
         let foundEntity = false;
         let closestPoint = null;
@@ -618,12 +863,15 @@ class Edge {
     bindToEntity(freeEndX, freeEndY, closestPoint, entity) {
         if (this.draggingHandle === this.handle1) {
             this.entity1 = entity;
-            this.element.setAttribute('x1', closestPoint.x);
-            this.element.setAttribute('y1', closestPoint.y);
+            this.setStandalonePosition(closestPoint.x, closestPoint.y,
+                parseFloat(this.element.getAttribute('points').split(' ')[3].split(',')[0]),
+                parseFloat(this.element.getAttribute('points').split(' ')[3].split(',')[1]));
         } else if (this.draggingHandle === this.handle2) {
             this.entity2 = entity;
-            this.element.setAttribute('x2', closestPoint.x);
-            this.element.setAttribute('y2', closestPoint.y);
+            this.setStandalonePosition(
+                parseFloat(this.element.getAttribute('points').split(' ')[0].split(',')[0]),
+                parseFloat(this.element.getAttribute('points').split(' ')[0].split(',')[1]),
+                closestPoint.x, closestPoint.y);
         }
     }
 
@@ -665,31 +913,79 @@ class Edge {
     }
 
     updateBothEnds() {
-        const start = this.entity1.findClosestConnectionPoint(this.entity2);
-        const end = this.entity2.findClosestConnectionPoint(this.entity1);
-        this.setStandalonePosition(start.x, start.y, end.x, end.y);
+        console.log("updateBoth")
+        const { start, end } = this.entity1.findClosestConnectionPoints(this.entity2);
+        
+        if (start && end) {
+            this.setStandalonePosition(start.x, start.y, end.x, end.y);
+        }
     }
 
     updateStart() {
-        const start = this.entity1.findClosestConnectionPoint({
-            geometry: { x: this.element.getAttribute('x2'), y: this.element.getAttribute('y2'), width: 0, height: 0 }
+        console.log("updateStart")
+        const pointsString = this.element.getAttribute('points');
+        
+        const pointsArray = pointsString.split(' ').map(point => {
+            const [x, y] = point.split(',');
+            return { x: parseFloat(x), y: parseFloat(y) };
         });
+    
+        const lastPoint = pointsArray[pointsArray.length - 1];
+        console.log("lastPoint",lastPoint)
+    
+        const { start } = this.entity1.findClosestConnectionPoints({
+            geometry: { 
+                x: lastPoint.x,
+                y: lastPoint.y,
+                width: 0,
+                height: 0 
+            },
+            setConnectionPoints: function () {
+                this.connectionPoints = [{ x: lastPoint.x, y: lastPoint.y }];
+            }
+        });
+        console.log("start in updateStart",start)
+    
         this.setStandalonePosition(start.x, start.y,
-            this.element.getAttribute('x2') || 0,
-            this.element.getAttribute('y2') || 0);
+            lastPoint.x,
+            lastPoint.y);
     }
 
     updateEnd() {
-        const end = this.entity2.findClosestConnectionPoint({
-            geometry: { x: this.element.getAttribute('x1'), y: this.element.getAttribute('y1'), width: 0, height: 0 }
-        });
-        this.setStandalonePosition(
-            this.element.getAttribute('x1') || 0,
-            this.element.getAttribute('y1') || 0,
-            end.x, end.y);
-    }
-}
+        console.log("updateEnd")
+        const pointsString = this.element.getAttribute('points');
+        console.log("pointsString", pointsString);
+        console.log("entity2 connectionPoints", this.entity2.connectionPoints);
 
+        const pointsArray = pointsString.split(' ').map(point => {
+            const [x, y] = point.split(',');
+            return { x: parseFloat(x), y: parseFloat(y) };
+        });
+
+        const firstPoint = pointsArray[0];
+        console.log("firstPoint", firstPoint);
+    
+        let closestPoint = null;
+        let minDistance = Infinity;
+    
+        this.entity2.setConnectionPoints()
+        for (const point2 of this.entity2.connectionPoints) {
+            const distance = this.entity2.calculateDistance(firstPoint, point2);
+            if (distance < minDistance) {
+                minDistance = distance;
+                closestPoint = point2;
+            }
+        }
+    
+        console.log("Closest point on entity2:", closestPoint);
+    
+        this.setStandalonePosition(
+            firstPoint.x,
+            firstPoint.y,
+            closestPoint.x, closestPoint.y
+        );
+    }  
+}
 
 const svgContainer = document.getElementById('svgContainer');
 const graphHandler = new GraphHandler(svgContainer);
@@ -726,6 +1022,22 @@ document.getElementById('addAttributeButton').addEventListener('click', () => {
         attributes.push(attribute);
         attributeInput.value = '';
         updateAttributesList();
+    }
+});
+
+
+document.getElementById('saveGraphButton').addEventListener('click', () => {
+    graphHandler.saveGraphState();  // Сохраняем граф в файл
+});
+document.getElementById('loadGraphButton').addEventListener('click', () => {
+    document.getElementById('fileInput').click();
+});
+
+document.getElementById('fileInput').addEventListener('change', (event) => {
+    const file = event.target.files[0];
+    if (file) {
+        // const graphHandler = new GraphHandler(document.getElementById('svgContainer')); // Adjust container
+        graphHandler.loadState(file);
     }
 });
 
