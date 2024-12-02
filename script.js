@@ -1,10 +1,12 @@
 class Entity {
-    constructor(graph, name, x, y, width, height, isStrong) {
+    constructor(graph, name, x, y, width, height, isStrong, isIdentificationDependent = false) {
         this.graph = graph;
         this.geometry = { x, y, width, height };
         this.label = name || 'New Entity';
-        this.isStrong = isStrong; 
+        this.isStrong = isStrong;
+        this.isIdentificationDependent = isIdentificationDependent;
         this.initialFillColor = this.isStrong ? '#77dd77' : '#ffc26c';
+        this.borderRadius = isIdentificationDependent ? 10 : 0; 
         this.element = this.createEntityElement();
         this.attributes = [];
         this.selected = false;
@@ -15,6 +17,7 @@ class Entity {
         this.connectionPoints = [];
         this.setConnectionPoints();
         this.hasPrimaryAttribute = false;
+
     }
     isPointInEntity(px, py) {
         return (
@@ -27,25 +30,27 @@ class Entity {
 
     createEntityElement() {
         const entityGroup = this.createSVGElement('g', { class: 'node', transform: `translate(${this.geometry.x}, ${this.geometry.y})` });
-        
-        this.rect = this.createSVGElement('rect', { 
-            width: this.geometry.width, 
-            height: this.geometry.height, 
-            fill: this.initialFillColor, 
-            stroke: 'black', 
-            'stroke-width': '1' 
+
+        this.rect = this.createSVGElement('rect', {
+            width: this.geometry.width,
+            height: this.geometry.height,
+            fill: this.initialFillColor,
+            stroke: 'black',
+            'stroke-width': '1',
+            rx: this.borderRadius,
+            ry: this.borderRadius
         });
-    
-        this.text = this.createSVGElement('text', { 
-            x: this.geometry.width / 2, 
+
+        this.text = this.createSVGElement('text', {
+            x: this.geometry.width / 2,
             y: -5,
-            'dominant-baseline': 'middle', 
-            'text-anchor': 'middle', 
-            fill: 'black', 
-            'font-size': '14' 
+            'dominant-baseline': 'middle',
+            'text-anchor': 'middle',
+            fill: 'black',
+            'font-size': '12'
         });
         this.text.textContent = this.label;
-    
+
         entityGroup.appendChild(this.text);
         entityGroup.appendChild(this.rect);
 
@@ -54,10 +59,10 @@ class Entity {
         entityGroup.appendChild(this.identifierGroup);
         entityGroup.appendChild(this.attributeGroup);
         this.graph.container.appendChild(entityGroup);
-    
+
         return entityGroup;
     }
-    
+
     createSVGElement(tag, attributes) {
         const element = document.createElementNS('http://www.w3.org/2000/svg', tag);
         Object.entries(attributes).forEach(([key, value]) => element.setAttribute(key, value));
@@ -75,7 +80,7 @@ class Entity {
         event.stopPropagation();
     }
 
-   
+
     createResizeHandle() {
         return this.createSVGElement('rect', {
             width: '10',
@@ -84,7 +89,7 @@ class Entity {
             x: this.geometry.width - 10,
             y: this.geometry.height - 10,
             cursor: 'nwse-resize',
-            display: 'none' 
+            display: 'none'
         });
     }
 
@@ -106,19 +111,49 @@ class Entity {
     resize(event) {
         if (!this.graph.isResizing || this.graph.selectedEntity !== this) return;
 
-        const newWidth = this.initialWidth + (event.clientX - (this.element.getBoundingClientRect().left + this.initialWidth));
-        const newHeight = this.initialHeight + (event.clientY - (this.element.getBoundingClientRect().top + this.initialHeight));
+        const rect = this.element.getBoundingClientRect();
+        const deltaX = event.clientX - rect.left;
+        const deltaY = event.clientY - rect.top;
 
-        if (newWidth > 10) {
-            this.updateWidth(newWidth);
-        }
-        if (newHeight > 10) {
-            this.updateHeight(newHeight);
-        }
+        const newWidth = Math.max(this.calculateMinWidth(), deltaX);
+        const newHeight = Math.max(this.calculateMinHeight(), deltaY);
+
+        this.updateWidth(newWidth);
+        this.updateHeight(newHeight);
 
         this.updateTextPosition();
         this.setConnectionPoints();
         this.graph.updateEdges();
+    }
+
+    calculateMinWidth() {
+        let minWidth = 0;
+        this.attributes.forEach(attr => {
+            const tempText = this.createSVGElement('text', {
+                'font-size': '12',
+                'dominant-baseline': 'middle'
+            });
+            tempText.textContent = attr.name;
+            this.graph.container.appendChild(tempText);
+            const textWidth = tempText.getBBox().width;
+            this.graph.container.removeChild(tempText);
+
+            minWidth = Math.max(minWidth, textWidth + 10); 
+        });
+        return minWidth;
+    }
+
+    calculateMinHeight() {
+        const tempText = this.createSVGElement('text', {
+            'font-size': '12',
+            'dominant-baseline': 'middle'
+        });
+        tempText.textContent = 'Sample';
+        this.graph.container.appendChild(tempText);
+        const textHeight = tempText.getBBox().height;
+        this.graph.container.removeChild(tempText);
+
+        return this.attributes.length * (textHeight + 10);
     }
 
     updateWidth(newWidth) {
@@ -135,12 +170,12 @@ class Entity {
         this.updateResizeHandlePosition();
         this.updateAttributePositions();
     }
-    
+
     updateAttributeWidth(newWidth) {
         const attributeRects = this.element.querySelectorAll('.table-cell');
         attributeRects.forEach(attributeRect => attributeRect.setAttribute('width', newWidth));
     }
-    
+
     updateResizeHandlePosition() {
         this.resizeHandle.setAttribute('x', this.geometry.width - 10);
         this.resizeHandle.setAttribute('y', this.geometry.height - 10);
@@ -148,28 +183,28 @@ class Entity {
 
     updateAttributePositions() {
         const attributeRects = this.element.querySelectorAll('.table-cell');
-    
+
         const attributeCount = attributeRects.length;
-    
+
         if (attributeCount === 0) return;
-    
+
         const totalHeight = this.geometry.height;
-        const heightPerAttribute = totalHeight / attributeCount; 
-    
+        const heightPerAttribute = totalHeight / attributeCount;
+
         attributeRects.forEach((attributeRect, index) => {
-            const newYPos = heightPerAttribute * index; 
+            const newYPos = heightPerAttribute * index;
             attributeRect.setAttribute('y', newYPos);
-            attributeRect.setAttribute('height', heightPerAttribute); 
-    
+            attributeRect.setAttribute('height', heightPerAttribute);
+
             const text = attributeRect.nextElementSibling;
             if (text) {
-                text.setAttribute('y', newYPos + heightPerAttribute / 2); 
+                text.setAttribute('y', newYPos + heightPerAttribute / 2);
             }
         });
-    
+
         this.resizeHandle.setAttribute('y', totalHeight - 10);
     }
-    
+
 
     stopResizing() {
         this.graph.isResizing = false;
@@ -186,53 +221,136 @@ class Entity {
     handleAddButtonClick(event) {
         event.stopPropagation();
     }
- 
+
     addElement(name, isIdentifier = false) {
         this.attributes.push({ name, isIdentifier });
         this.updateAttributesOnCanvas();
     }
 
     updateAttributesOnCanvas() {
+        const cellHeight = 30; 
+    
         this.identifierGroup.innerHTML = '';
         this.attributeGroup.innerHTML = '';
-
-        const heightPerAttribute = this.geometry.height / (this.attributes.length || 1);
-        
-        this.attributes.forEach((attr, index) => {
-            const yPos = heightPerAttribute * index;
+    
+        let maxWidth = this.geometry.width; 
+    
+        const identifiers = this.attributes.filter(attr => attr.isIdentifier);
+        const attributes = this.attributes.filter(attr => !attr.isIdentifier);
+    
+        let yPos = 0; 
+    
+        identifiers.forEach((attr, index) => {
+            const cellColor = this.isStrong ? '#4fc14f' : '#e9a039'; 
+    
+            const isFirst = index === 0;
+            const isLast = index === identifiers.length - 1 && attributes.length === 0;
+    
             const attributeRect = this.createSVGElement('rect', {
                 class: 'table-cell',
-                width: this.geometry.width,
-                height: heightPerAttribute, 
+                width: maxWidth,
+                height: cellHeight,
                 y: yPos,
-                fill: this.initialFillColor,
-                stroke: 'black',
-                'stroke-width': '1'
+                fill: cellColor,
+                stroke: 'none',
+                rx: isFirst || isLast ? this.borderRadius : 0,
+                ry: isFirst || isLast ? this.borderRadius : 0,
             });
-            
+    
             const text = this.createSVGElement('text', {
-                x: '5',
-                y: yPos + heightPerAttribute / 2, 
+                x: currentModelType === 'Relational' ? 20 : 5, 
+                y: yPos + cellHeight / 2 + 4,
                 fill: 'black',
                 'font-size': '12',
-                'text-anchor': 'start'
+                'text-anchor': 'start',
             });
             text.textContent = attr.name;
-
-            if (attr.isIdentifier) {
-                this.identifierGroup.appendChild(attributeRect);
-                this.identifierGroup.appendChild(text);
-            } else {
-                this.attributeGroup.appendChild(attributeRect);
-                this.attributeGroup.appendChild(text);
+    
+            if (currentModelType === 'Relational') {
+                const keyIcon = this.createSVGElement('image', {
+                    'xlink:href': './assets/key.png', 
+                    x: 5, 
+                    y: yPos + (cellHeight - 12) / 2, 
+                    width: 12,
+                    height: 12,
+                });
+                this.identifierGroup.appendChild(keyIcon);
             }
+    
+            this.identifierGroup.appendChild(attributeRect);
+            this.identifierGroup.appendChild(text);
+    
+            const tempText = this.createSVGElement('text', {
+                'font-size': '12',
+                'dominant-baseline': 'middle',
+                'text-anchor': 'start',
+            });
+            tempText.textContent = attr.name;
+            this.graph.container.appendChild(tempText);
+            const textWidth = tempText.getBBox().width;
+            this.graph.container.removeChild(tempText);
+    
+            maxWidth = Math.max(maxWidth, textWidth + 20);
+            yPos += cellHeight; 
         });
-
-        this.geometry.height = heightPerAttribute * this.attributes.length;  
+    
+        attributes.forEach((attr, index) => {
+            const isFirst = identifiers.length === 0 && index === 0;
+            const isLast = index === attributes.length - 1;
+    
+            const attributeRect = this.createSVGElement('rect', {
+                class: 'table-cell',
+                width: maxWidth,
+                height: cellHeight,
+                y: yPos,
+                fill: this.initialFillColor,
+                stroke: 'none', 
+                rx: isFirst || isLast ? this.borderRadius : 0,
+                ry: isFirst || isLast ? this.borderRadius : 0,
+            });
+    
+            const text = this.createSVGElement('text', {
+                x: 5,
+                y: yPos + cellHeight / 2 + 4,
+                fill: 'black',
+                'font-size': '12',
+                'text-anchor': 'start',
+            });
+            text.textContent = attr.name;
+    
+            this.attributeGroup.appendChild(attributeRect);
+            this.attributeGroup.appendChild(text);
+    
+            const tempText = this.createSVGElement('text', {
+                'font-size': '12',
+                'dominant-baseline': 'middle',
+                'text-anchor': 'start',
+            });
+            tempText.textContent = attr.name;
+            this.graph.container.appendChild(tempText);
+            const textWidth = tempText.getBBox().width;
+            this.graph.container.removeChild(tempText);
+    
+            maxWidth = Math.max(maxWidth, textWidth + 20);
+            yPos += cellHeight; 
+        });
+    
+        this.geometry.width = maxWidth;
+        this.geometry.height = yPos;
+        this.rect.setAttribute('width', maxWidth);
         this.rect.setAttribute('height', this.geometry.height);
+    
+        this.rect.setAttribute('width', maxWidth);
+        this.rect.setAttribute('height', this.geometry.height);
+        this.rect.setAttribute('fill', 'none'); 
+        this.rect.setAttribute('stroke', 'black'); 
+        this.rect.setAttribute('stroke-width', '1');
+    
+        this.element.appendChild(this.rect);
+    
         this.updateResizeHandlePosition();
     }
-
+    
     setConnectionPoints() {
         const { x, y, width, height } = this.geometry;
         this.connectionPoints = [
@@ -246,28 +364,28 @@ class Entity {
         const { x, y } = connectionPoint;
         const { x: entityX, y: entityY, width, height } = this.geometry;
         const tolerance = 1;
-    
+
         if (Math.abs(x - entityX) <= tolerance) {
-            return 0; 
+            return 0;
         } else if (Math.abs(x - (entityX + width)) <= tolerance) {
-            return 1; 
+            return 1;
         } else if (Math.abs(y - entityY) <= tolerance) {
-            return 2; 
+            return 2;
         } else if (Math.abs(y - (entityY + height)) <= tolerance) {
-            return 3; 
+            return 3;
         }
-    
+
         console.warn("Connection point is out of bounds:", connectionPoint);
         return -1;
     }
-    
+
     findClosestConnectionPoints(targetEntity) {
         this.setConnectionPoints();
         targetEntity.setConnectionPoints();
         console.log("targetEntity connectionPoints in findMethod", targetEntity.connectionPoints);
         let minDistance = Infinity;
         let closestPoints = { start: null, end: null };
-    
+
         for (const point1 of this.connectionPoints) {
             for (const point2 of targetEntity.connectionPoints) {
                 const distance = this.calculateDistance(point1, point2);
@@ -278,10 +396,10 @@ class Entity {
                 }
             }
         }
-    
-        return closestPoints; 
+
+        return closestPoints;
     }
-    
+
 
     calculateDistance(point1, point2) {
         const dx = point1.x - point2.x;
@@ -333,112 +451,112 @@ class GraphHandler {
         // });
     }
     saveGraphState() {
-    const graphState = {
-        entities: this.cells.map(entity => this.serializeEntity(entity)),
-        edges: this.edges.map(edge => this.serializeEdge(edge))
-    };
+        const graphState = {
+            entities: this.cells.map(entity => this.serializeEntity(entity)),
+            edges: this.edges.map(edge => this.serializeEdge(edge))
+        };
 
-    const jsonString = JSON.stringify(graphState, null, 2);
-    
-    const blob = new Blob([jsonString], { type: 'application/json' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = 'graphState.json';
-    link.click();
-}
+        const jsonString = JSON.stringify(graphState, null, 2);
 
-serializeEntity(entity) {
-    return {
-        name: entity.label,
-        x: entity.geometry.x,
-        y: entity.geometry.y,
-        width: entity.geometry.width,
-        height: entity.geometry.height,
-        isStrong: entity.isStrong,
-        attributes: entity.attributes.filter(attr => !attr.isIdentifier).map(attr => attr.name), // Only regular attributes
-        identifiers: entity.attributes.filter(attr => attr.isIdentifier).map(attr => attr.name) // Only identifiers
-    };
-}
+        const blob = new Blob([jsonString], { type: 'application/json' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'graphState.json';
+        link.click();
+    }
 
-serializeEdge(edge) {
-    const pointsString = edge.element.getAttribute('points');
-    const pointsArray = pointsString.split(' ').map(point => {
-        const [x, y] = point.split(',');
-        return { x: parseFloat(x), y: parseFloat(y) };
-    });
+    serializeEntity(entity) {
+        return {
+            name: entity.label,
+            x: entity.geometry.x,
+            y: entity.geometry.y,
+            width: entity.geometry.width,
+            height: entity.geometry.height,
+            isStrong: entity.isStrong,
+            attributes: entity.attributes.filter(attr => !attr.isIdentifier).map(attr => attr.name), // Only regular attributes
+            identifiers: entity.attributes.filter(attr => attr.isIdentifier).map(attr => attr.name) // Only identifiers
+        };
+    }
 
-    return {
-        isStandalone: edge.isStandalone,
-        entity1: edge.entity1 ? edge.entity1.label : null,
-        entity2: edge.entity2 ? edge.entity2.label : null,
-        points: pointsArray 
-    };
-}
+    serializeEdge(edge) {
+        const pointsString = edge.element.getAttribute('points');
+        const pointsArray = pointsString.split(' ').map(point => {
+            const [x, y] = point.split(',');
+            return { x: parseFloat(x), y: parseFloat(y) };
+        });
+
+        return {
+            isStandalone: edge.isStandalone,
+            entity1: edge.entity1 ? edge.entity1.label : null,
+            entity2: edge.entity2 ? edge.entity2.label : null,
+            points: pointsArray
+        };
+    }
 
 
-loadState(file) {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        try {
-            const graphState = JSON.parse(e.target.result);
-            this.cells = [];
-            this.edges = [];
+    loadState(file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const graphState = JSON.parse(e.target.result);
+                this.cells = [];
+                this.edges = [];
 
-            graphState.entities.forEach(entityData => {
-                const entity = new Entity(
-                    this, 
-                    entityData.name, 
-                    entityData.x, 
-                    entityData.y, 
-                    entityData.width, 
-                    entityData.height, 
-                    entityData.isStrong
-                );
+                graphState.entities.forEach(entityData => {
+                    const entity = new Entity(
+                        this,
+                        entityData.name,
+                        entityData.x,
+                        entityData.y,
+                        entityData.width,
+                        entityData.height,
+                        entityData.isStrong
+                    );
 
-                if (entityData.identifiers.length > 0) {
-                    entityData.identifiers.forEach(identifier => {
-                        entity.addElement(identifier, true);
-                    });
-                }
+                    if (entityData.identifiers.length > 0) {
+                        entityData.identifiers.forEach(identifier => {
+                            entity.addElement(identifier, true);
+                        });
+                    }
 
-                if (entityData.attributes.length > 0) {
-                    entityData.attributes.forEach(attribute => {
-                        entity.addElement(attribute, false);
-                    });
-                }
+                    if (entityData.attributes.length > 0) {
+                        entityData.attributes.forEach(attribute => {
+                            entity.addElement(attribute, false);
+                        });
+                    }
 
-                this.cells.push(entity);
-                this.container.appendChild(entity.element);
-            });
+                    this.cells.push(entity);
+                    this.container.appendChild(entity.element);
+                });
 
-            graphState.edges.forEach(edgeData => {
-                let entity1 = null, entity2 = null;
+                graphState.edges.forEach(edgeData => {
+                    let entity1 = null, entity2 = null;
 
-                if (edgeData.entity1) {
-                    entity1 = this.cells.find(e => e.label === edgeData.entity1);
-                }
-                if (edgeData.entity2) {
-                    entity2 = this.cells.find(e => e.label === edgeData.entity2);
-                }
+                    if (edgeData.entity1) {
+                        entity1 = this.cells.find(e => e.label === edgeData.entity1);
+                    }
+                    if (edgeData.entity2) {
+                        entity2 = this.cells.find(e => e.label === edgeData.entity2);
+                    }
 
-                const edge = new Edge(this, entity1, entity2, edgeData.isStandalone);
+                    const edge = new Edge(this, entity1, entity2, edgeData.isStandalone);
 
-                edge.element.setAttribute('points', edgeData.points.map(p => `${p.x},${p.y}`).join(' '));
-                edge.updateHandles();
+                    edge.element.setAttribute('points', edgeData.points.map(p => `${p.x},${p.y}`).join(' '));
+                    edge.updateHandles();
 
-                this.container.appendChild(edge.element);
-                this.container.appendChild(edge.handle1);
-                this.container.appendChild(edge.handle2);
+                    this.container.appendChild(edge.element);
+                    this.container.appendChild(edge.handle1);
+                    this.container.appendChild(edge.handle2);
 
-                this.edges.push(edge);
-            });
-            this.logCells();
-        } catch (err) {
-            console.error('error:', err);
-        }
-    };
-    reader.readAsText(file);
-}
+                    this.edges.push(edge);
+                });
+                this.logCells();
+            } catch (err) {
+                console.error('error:', err);
+            }
+        };
+        reader.readAsText(file);
+    }
     onMouseMove(event) {
         if (this.isDragging) {
             this.moveEntity(event);
@@ -525,6 +643,19 @@ class SelectionModel {
         this.highlightSelection(entity);
         this.showResizeHandle(entity);
         displaySelectedEntityData(entity);
+        this.closeOpenPanels();
+    }
+
+    closeOpenPanels() {
+        const entityOptions = document.getElementById('entityOptions');
+        const edgeOptions = document.getElementById('edgeOptions');
+
+        if (entityOptions) {
+            entityOptions.style.display = 'none';
+        }
+        if (edgeOptions) {
+            edgeOptions.style.display = 'none';
+        }
     }
 
     selectEdge(edge) {
@@ -549,7 +680,7 @@ class SelectionModel {
     }
 
     clearEntitySelection(entity) {
-        entity.rect.setAttribute('stroke', 'black'); 
+        entity.rect.setAttribute('stroke', 'black');
         this.hideResizeHandle(entity);
     }
 
@@ -570,7 +701,7 @@ class SelectionModel {
     }
 
     highlightEntitySelection(entity) {
-        entity.rect.setAttribute('stroke', 'red'); 
+        entity.rect.setAttribute('stroke', 'red');
     }
 
     deselect() {
@@ -599,7 +730,7 @@ class Edge {
         this.graph.container.appendChild(this.element);
         this.graph.container.appendChild(this.handle1);
         this.graph.container.appendChild(this.handle2);
-        
+
         this.initDragEvents();
         this.initEvents();
 
@@ -634,11 +765,11 @@ class Edge {
 
     createPolylinePath(start, end) {
         const points = [];
-    
+
         if (!this.entity1 && !this.entity2) {
             const deltaX = Math.abs(start.x - end.x);
             const deltaY = Math.abs(start.y - end.y);
-    
+
             if (deltaX > deltaY) {
                 const middleX = (start.x + end.x) / 2;
                 points.push(
@@ -678,12 +809,12 @@ class Edge {
         } else if (!this.entity1 && this.entity2) {
             console.log("entity2 существует")
             const side = this.entity2.getConnectionPointSide(end)
-            console.log("end",end)
+            console.log("end", end)
             console.log(side)
-    
+
             const middleX = (start.x + end.x) / 2;
             const middleY = (start.y + end.y) / 2;
-           
+
             if (side == 0 || side == 1) {
                 points.push(
                     { x: start.x, y: start.y },
@@ -730,7 +861,7 @@ class Edge {
         }
         return points.map(p => `${p.x},${p.y}`).join(' ');
     }
-    
+
     updateHandles() {
         const points = this.element.getAttribute('points').split(' ');
         const x1 = parseFloat(points[0].split(',')[0]);
@@ -755,7 +886,7 @@ class Edge {
 
     startHandleDrag(event, handle) {
         if ((handle === this.handle1 && this.entity1) || (handle === this.handle2 && this.entity2)) {
-            return; 
+            return;
         }
         this.draggingHandle = handle;
         event.stopPropagation();
@@ -795,11 +926,11 @@ class Edge {
         const newY = event.clientY;
 
         if (this.draggingHandle === this.handle1) {
-            console.log("поинтс", newX,newY,parseFloat(this.element.getAttribute('points').split(' ')[3].split(',')[0]), parseFloat(this.element.getAttribute('points').split(' ')[3].split(',')[1]))
+            console.log("поинтс", newX, newY, parseFloat(this.element.getAttribute('points').split(' ')[3].split(',')[0]), parseFloat(this.element.getAttribute('points').split(' ')[3].split(',')[1]))
             this.setStandalonePosition(newX, newY,
                 parseFloat(this.element.getAttribute('points').split(' ')[3].split(',')[0]),
                 parseFloat(this.element.getAttribute('points').split(' ')[3].split(',')[1]));
-             this.updatePosition()
+            this.updatePosition()
             console.log("handle1")
         } else if (this.draggingHandle === this.handle2) {
             this.setStandalonePosition(
@@ -915,7 +1046,7 @@ class Edge {
     updateBothEnds() {
         console.log("updateBoth")
         const { start, end } = this.entity1.findClosestConnectionPoints(this.entity2);
-        
+
         if (start && end) {
             this.setStandalonePosition(start.x, start.y, end.x, end.y);
         }
@@ -924,28 +1055,28 @@ class Edge {
     updateStart() {
         console.log("updateStart")
         const pointsString = this.element.getAttribute('points');
-        
+
         const pointsArray = pointsString.split(' ').map(point => {
             const [x, y] = point.split(',');
             return { x: parseFloat(x), y: parseFloat(y) };
         });
-    
+
         const lastPoint = pointsArray[pointsArray.length - 1];
-        console.log("lastPoint",lastPoint)
-    
+        console.log("lastPoint", lastPoint)
+
         const { start } = this.entity1.findClosestConnectionPoints({
-            geometry: { 
+            geometry: {
                 x: lastPoint.x,
                 y: lastPoint.y,
                 width: 0,
-                height: 0 
+                height: 0
             },
             setConnectionPoints: function () {
                 this.connectionPoints = [{ x: lastPoint.x, y: lastPoint.y }];
             }
         });
-        console.log("start in updateStart",start)
-    
+        console.log("start in updateStart", start)
+
         this.setStandalonePosition(start.x, start.y,
             lastPoint.x,
             lastPoint.y);
@@ -964,10 +1095,10 @@ class Edge {
 
         const firstPoint = pointsArray[0];
         console.log("firstPoint", firstPoint);
-    
+
         let closestPoint = null;
         let minDistance = Infinity;
-    
+
         this.entity2.setConnectionPoints()
         for (const point2 of this.entity2.connectionPoints) {
             const distance = this.entity2.calculateDistance(firstPoint, point2);
@@ -976,15 +1107,15 @@ class Edge {
                 closestPoint = point2;
             }
         }
-    
+
         console.log("Closest point on entity2:", closestPoint);
-    
+
         this.setStandalonePosition(
             firstPoint.x,
             firstPoint.y,
             closestPoint.x, closestPoint.y
         );
-    }  
+    }
 }
 
 const svgContainer = document.getElementById('svgContainer');
@@ -1026,10 +1157,10 @@ document.getElementById('addAttributeButton').addEventListener('click', () => {
 });
 
 
-document.getElementById('saveGraphButton').addEventListener('click', () => {
-    graphHandler.saveGraphState();  // Сохраняем граф в файл
+document.getElementById('downloadButton').addEventListener('click', () => {
+    graphHandler.saveGraphState();  
 });
-document.getElementById('loadGraphButton').addEventListener('click', () => {
+document.getElementById('uploadButton').addEventListener('click', () => {
     document.getElementById('fileInput').click();
 });
 
@@ -1066,19 +1197,26 @@ function updateAttributesList() {
 // Создать сущность 
 document.getElementById('createEntityButton').addEventListener('click', () => {
     const selectedType = document.querySelector('input[name="entityType"]:checked').value;
-    const isStrong = selectedType === 'strong';
     const entityName = document.getElementById('entityNameInput').value || 'New Entity';
+
+    let isStrong = false;
+    let isIdentificationDependent = false;
+
+    if (selectedType === 'strong') {
+        isStrong = true;
+    } else if (selectedType === 'identificationDependent') {
+        isIdentificationDependent = true;
+    }
 
     const centerX = svgContainer.clientWidth / 2;
     const centerY = svgContainer.clientHeight / 2;
-    const newEntity = new Entity(graphHandler, entityName, centerX - 60, centerY - 30, 120, 60, isStrong);
-    
+    const newEntity = new Entity(graphHandler, entityName, centerX - 60, centerY - 30, 120, 60, isStrong, isIdentificationDependent);
+
     identifiers.forEach(id => newEntity.addElement(id, true));
     attributes.forEach(attr => newEntity.addElement(attr, false));
-    
+
     graphHandler.addEntity(newEntity);
 
-    // Скрыть меню 
     document.getElementById('entityOptions').style.display = 'none';
     identifiers = [];
     attributes = [];
@@ -1104,8 +1242,7 @@ function displaySelectedEntityData(entity) {
 
     const selectedIdentifiersList = document.getElementById('selectedIdentifiersList');
     const selectedAttributesList = document.getElementById('selectedAttributesList');
-    selectedIdentifiersList.innerHTML = '<h5>Identifiers</h5>';
-    selectedAttributesList.innerHTML = '<h5>Attributes</h5>';
+
 
     entity.attributes.forEach((attr, index) => {
         if (attr.isIdentifier) {
@@ -1121,7 +1258,7 @@ function displaySelectedEntityData(entity) {
         if (!attr.isIdentifier) {
             const item = createEditableItem(attr.name, (newName) => {
                 entity.attributes[index].name = newName;
-                entity.updateAttributesOnCanvas(); 
+                entity.updateAttributesOnCanvas();
             });
             selectedAttributesList.appendChild(item);
         }
@@ -1147,8 +1284,24 @@ function createEditableItem(value, onSave) {
 document.getElementById('addNewIdentifierButton').addEventListener('click', () => {
     const newIdentifierInput = document.getElementById('newIdentifierInput');
     const newIdentifier = newIdentifierInput.value.trim();
+
     if (newIdentifier && selectedEntity) {
         selectedEntity.addElement(newIdentifier, true);
+
+        const tempText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        tempText.setAttribute('font-size', '12');
+        tempText.textContent = newIdentifier;
+        document.getElementById('svgContainer').appendChild(tempText);
+        const textWidth = tempText.getBBox().width + 20; 
+        document.getElementById('svgContainer').removeChild(tempText);
+
+        if (textWidth > selectedEntity.geometry.width) {
+            selectedEntity.geometry.width = textWidth;
+            selectedEntity.rect.setAttribute('width', textWidth);
+        }
+
+        selectedEntity.updateAttributesOnCanvas();
+
         displaySelectedEntityData(selectedEntity);
         newIdentifierInput.value = '';
     }
@@ -1157,17 +1310,35 @@ document.getElementById('addNewIdentifierButton').addEventListener('click', () =
 document.getElementById('addNewAttributeButton').addEventListener('click', () => {
     const newAttributeInput = document.getElementById('newAttributeInput');
     const newAttribute = newAttributeInput.value.trim();
+
     if (newAttribute && selectedEntity) {
         selectedEntity.addElement(newAttribute, false);
+
+        const tempText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        tempText.setAttribute('font-size', '12');
+        tempText.textContent = newAttribute;
+        document.getElementById('svgContainer').appendChild(tempText);
+        const textWidth = tempText.getBBox().width + 20; 
+        document.getElementById('svgContainer').removeChild(tempText);
+
+        if (textWidth > selectedEntity.geometry.width) {
+            selectedEntity.geometry.width = textWidth;
+            selectedEntity.rect.setAttribute('width', textWidth);
+        }
+
+        selectedEntity.updateAttributesOnCanvas();
+
         displaySelectedEntityData(selectedEntity);
         newAttributeInput.value = '';
     }
 });
 
+
+
 document.getElementById('selectedEntityNameInput').addEventListener('input', (event) => {
     if (selectedEntity) {
         selectedEntity.label = event.target.value;
-        selectedEntity.updateTextPosition(); 
+        selectedEntity.updateTextPosition();
     }
 });
 
@@ -1177,7 +1348,7 @@ function resetEntityForm() {
     document.getElementById('attributesList').innerHTML = '';
     document.getElementById('identifierInput').value = '';
     document.getElementById('attributeInput').value = '';
-    document.getElementById('entityNameInput').value = ''; 
+    document.getElementById('entityNameInput').value = '';
 }
 
 // Очистка панели
@@ -1192,21 +1363,45 @@ document.getElementById('addEdgeButton').addEventListener('click', () => {
     const svgWidth = svgContainer.clientWidth;
     const svgHeight = svgContainer.clientHeight;
 
-    const randomX1 = Math.floor(Math.random() * svgWidth);
-    const randomY1 = Math.floor(Math.random() * svgHeight);
-    const randomX2 = Math.floor(Math.random() * svgWidth);
-    const randomY2 = Math.floor(Math.random() * svgHeight);
+    const centerX = svgWidth / 2;
+    const centerY = svgHeight / 2;
 
-    graphHandler.addEdgeStandalone(randomX1, randomY1, randomX2, randomY2);
+    const offset = 50;
+
+    const startX = centerX - offset;
+    const startY = centerY;
+    const endX = centerX + offset;
+    const endY = centerY;
+
+    graphHandler.addEdgeStandalone(startX, startY, endX, endY);
 });
 
 
+let currentModelType = 'ER'; 
+
+document.querySelectorAll('input[name="modelType"]').forEach((radio) => {
+    radio.addEventListener('change', (event) => {
+        currentModelType = event.target.value;
+        updateAllEntities();
+    });
+});
+
+// обновление отображения сущностей
+function updateAllEntities() {
+    graphHandler.cells.forEach((entity) => {
+        if (entity instanceof Entity) {
+            entity.updateAttributesOnCanvas(); 
+        }
+    });
+}
+
 
 //////////////// пример работы /////////////////
-/*const svgContainer = document.getElementById('svgContainer');
-const graphHandler = new GraphHandler(svgContainer);
+/*
+//const svgContainer = document.getElementById('svgContainer');
+//const graphHandler = new GraphHandler(svgContainer);
 
-const entity1 = new Entity(graphHandler, 'Entity1', 400, 30, 50, 50);
+const entity1 = new Entity(graphHandler, 'Entity1', 400, 30, 50, 50, false, true);
 const entity2 = new Entity(graphHandler, 'Entity2', 250, 30, 50, 50);
 
 graphHandler.addEntity(entity1);

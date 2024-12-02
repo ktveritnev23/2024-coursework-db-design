@@ -16,6 +16,57 @@
     padding-top: 20px;
     box-shadow: 2px 0 5px rgba(0, 0, 0, 0.2);
     font-family: sans-serif;
+    overflow-y: auto; 
+    overflow-x: hidden;
+}
+
+.sidebar::-webkit-scrollbar {
+    width: 5px;
+}
+
+sidebar::-webkit-scrollbar-thumb {
+    background: #ccc; 
+    border-radius: 10px;
+}
+
+.sidebar::-webkit-scrollbar-thumb:hover {
+    background: #aaa; 
+}
+
+.sidebar::-webkit-scrollbar-track {
+    background: #f0f0f0; 
+}
+
+#modelTypeSelection {
+    margin-bottom: 20px;
+    text-align: left;
+    width: 90%;
+    font-family: sans-serif;
+}
+
+#modelTypeSelection label {
+    display: block;
+    margin: 5px 0;
+    font-size: 14px;
+}
+
+#downloadButton,
+#uploadButton {
+    font-size: 14px; 
+    color: white;
+    background-color: #9370db; 
+    border: 2px solid #5d3fd3; 
+    border-radius: 8px; 
+    padding: 8px 15px; 
+    width: 90%; 
+    margin: 10px 0;
+    cursor: pointer;
+    text-align: center;
+}
+
+#downloadButton:hover,
+#uploadButton:hover {
+    background-color: #bba3e0; 
 }
 
 #addEntityButton,
@@ -61,7 +112,9 @@ input[type="text"] {
 }
 
 #addIdentifierButton,
-#addAttributeButton {
+#addAttributeButton,
+#addNewIdentifierButton,
+#addNewAttributeButton {
     width: 85%; 
     margin: 5px 0;
     padding: 8px;

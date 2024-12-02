@@ -10,9 +10,17 @@
 
 <body>
     <div class="sidebar">
+        <div id="modelTypeSelection">
+            <label><input type="radio" name="modelType" value="ER" checked> ER Model</label>
+            <label><input type="radio" name="modelType" value="Relational"> Relational Model</label>
+        </div>
+
+        <button id="downloadButton">Download model</button>
+        <button id="uploadButton">Upload model</button>
+        <div class="separator"></div>
+
         <button id="addEntityButton">Add Entity</button>
-        <button id="saveGraphButton">Сохранить граф</button>
-        <button id="loadGraphButton">Load Graph</button>
+        
         <input type="file" id="fileInput" style="display: none;" />
 
         <!-- Параметры сущности--> 
@@ -22,6 +30,7 @@
             <div class="entity-type-options">
                 <label><input type="radio" name="entityType" value="strong" checked> Strong Entity</label>
                 <label><input type="radio" name="entityType" value="weak"> Weak Entity</label>
+                <label><input type="radio" name="entityType" value="identificationDependent"> ID-Dependent Entity</label>
             </div>
 
             <h4>Identifiers</h4>
@@ -37,17 +46,18 @@
             <button id="createEntityButton">Create Entity</button>
         </div>
 
-        <div class="separator"></div>
         <button id="addEdgeButton">Add Edge</button>
 
         <!-- Параметры выбранной сущности -->
         <div id="selectedEntityData" style="display: none;">
             <input type="text" id="selectedEntityNameInput" placeholder="Entity name">
         
+            <h4>Identifiers</h4>
             <div id="selectedIdentifiersList"></div>
             <input type="text" id="newIdentifierInput" placeholder="Enter new identifier">
             <button id="addNewIdentifierButton" class="addButton">Add New Identifier</button>
             
+            <h4>Attributes</h4>
             <div id="selectedAttributesList"></div>
             <input type="text" id="newAttributeInput" placeholder="Enter new attribute">
             <button id="addNewAttributeButton" class="addButton">Add New Attribute</button>
