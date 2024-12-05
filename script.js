@@ -45,7 +45,9 @@ class Entity {
             'dominant-baseline': 'middle', 
             'text-anchor': 'middle', 
             fill: 'black', 
-            'font-size': '14' 
+            'font-size': '14',
+            'font-family': 'Georgia, serif', 
+            'font-weight': 'bold'
         });
         this.text.textContent = this.label;
     
@@ -188,20 +190,25 @@ class Entity {
 
     updateTextPosition() {
         this.text.textContent = this.label;
-        this.text.setAttribute('x', this.geometry.width / 2);
-        this.text.setAttribute('y', -5);
+        this.text.setAttribute('x', 0); 
+        this.text.setAttribute('y', -15); 
+        this.text.setAttribute('text-anchor', 'start'); 
+        this.text.setAttribute('dominant-baseline', 'hanging');
     }
+    
 
     handleAddButtonClick(event) {
         event.stopPropagation();
     }
  
-    addElement(name, isIdentifier = false, isNull = false, isForeignKey = false) {
+    addElement(name, isIdentifier = false, isNull = false, isForeignKey = false, type = 'nvarchar', length = undefined) {
         this.attributes.push({
             name,
             isIdentifier,
             isNull,        
-            isForeignKey  
+            isForeignKey,
+            type,          
+            length         
         });
         this.updateAttributesOnCanvas();
     }
@@ -244,40 +251,58 @@ class Entity {
         this.attributes.forEach((attr, index) => {
             const yPos = heightPerAttribute * index;
     
-            // Определяем цвет для фона в зависимости от того, является ли атрибут идентификатором и слабым
-            let fillColor = this.initialFillColor; // Значение по умолчанию для обычных атрибутов
+            let fillColor = this.initialFillColor; 
     
-            console.log('attr:', attr);
-            console.log('isStrong:', isStrong);
-
             if (attr.isIdentifier) {
-                // If the attribute is an identifier
                 if (this.isRelational) {
-                    fillColor = '#B5B5B5'; // Gray for relational entity identifiers
+                    fillColor = '#B5B5B5'; 
                 } else if (isStrong) {
-                    fillColor = '#228B22'; // Green for strong identifiers
+                    fillColor = '#228B22'; 
                 } else {
-                    fillColor = '#E9A039'; // Yellow for weak identifiers
+                    fillColor = '#E9A039'; 
                 }
             }
     
             const attributeRect = this.createSVGElement('rect', {
                 class: 'table-cell',
                 width: this.geometry.width,
-                height: heightPerAttribute, 
+                height: heightPerAttribute,
                 y: yPos,
                 fill: fillColor,
                 stroke: 'none',
             });
     
+            let attributeText;
+            if (this.isRelational) {
+                attributeText = `${attr.name}: ${attr.type}`;
+                if (['int', 'nvarchar'].includes(attr.type) && attr.length) {
+                    attributeText += `(${attr.length})`;
+                }
+                attributeText += attr.isNull ? ' NULL' : ' NOT NULL';
+                if (attr.isForeignKey) {
+                    attributeText += ' (FK)';
+                }
+                if (attr.isIdentifier) {
+                    attributeText += ' (PK)';
+                }
+            } else {
+                attributeText = attr.name;
+            }
+    
+            const textAttributes = attr.isIdentifier
+                ? { 'font-size': '18', 'font-weight': 'bold' } 
+                : { 'font-size': '16', 'font-weight': 'normal' }; 
+    
             const text = this.createSVGElement('text', {
-                x: attr.isIdentifier ? '50' : '5', // Сдвигаем текст, если это идентификатор
-                y: yPos + heightPerAttribute / 2, 
+                x: attr.isIdentifier ? '50' : '5', 
+                y: yPos + heightPerAttribute / 2,
                 fill: 'black',
-                'font-size': '12',
+                'font-family': 'Georgia, serif', 
                 'text-anchor': 'start',
+                'alignment-baseline': 'middle', 
+                ...textAttributes, 
             });
-            text.textContent = attr.name;
+            text.textContent = attributeText;
     
             if (attr.isIdentifier) {
                 this.identifierGroup.appendChild(attributeRect);
@@ -285,12 +310,12 @@ class Entity {
                 if (this.isRelational) {
                     const keyIcon = this.createSVGElement('image', {
                         href: './resrcs/key.png',
-                        x: 5, // Координата X для ключика
-                        y: yPos + (heightPerAttribute - 12*2) / 2, // Центрируем ключик по высоте ячейки
-                        width: 12*2,
-                        height: 12*2,
+                        x: 5, 
+                        y: yPos + (heightPerAttribute - 12 * 2) / 2, 
+                        width: 12 * 3,
+                        height: 12 * 3,
                     });
-                    this.identifierGroup.appendChild(keyIcon); // Добавляем ключик поверх текста
+                    this.identifierGroup.appendChild(keyIcon); 
                 }
             } else {
                 this.attributeGroup.appendChild(attributeRect);
@@ -298,16 +323,13 @@ class Entity {
             }
         });
     
-        this.geometry.height = heightPerAttribute * this.attributes.length;  
+        this.geometry.height = heightPerAttribute * this.attributes.length;
         this.rect.setAttribute('height', this.geometry.height);
         this.updateResizeHandlePosition();
         this.updateAttributePositions();
         this.updateSeparator();
     }
     
-    
-    
-
     setConnectionPoints() {
         const { x, y, width, height } = this.geometry;
         this.connectionPoints = [
@@ -430,8 +452,8 @@ serializeEntity(entity) {
         width: entity.geometry.width,
         height: entity.geometry.height,
         isStrong: entity.isStrong,
-        attributes: entity.attributes.filter(attr => !attr.isIdentifier).map(attr => attr.name), // Only regular attributes
-        identifiers: entity.attributes.filter(attr => attr.isIdentifier).map(attr => attr.name) // Only identifiers
+        attributes: entity.attributes.filter(attr => !attr.isIdentifier).map(attr => attr.name), 
+        identifiers: entity.attributes.filter(attr => attr.isIdentifier).map(attr => attr.name) 
     };
 }
 
@@ -1157,6 +1179,16 @@ document.getElementById('createEntityButton').addEventListener('click', () => {
     updateIdentifiersList();
     updateAttributesList();
 });
+document.getElementById('attributeTypeSelect').addEventListener('change', (event) => {
+    const lengthInputContainer = document.getElementById('lengthInputContainer');
+    const selectedType = event.target.value;
+    
+    if (selectedType === 'int' || selectedType === 'nvarchar') {
+        lengthInputContainer.style.display = 'block';
+    } else {
+        lengthInputContainer.style.display = 'none';
+    }
+});
 
 
 let selectedEntity = null;
@@ -1208,47 +1240,88 @@ function displaySelectedEntityData(entity) {
 
 function createEditableItem(attr, onSave, entity) {
     const container = document.createElement('div');
-
+    
     const input = document.createElement('input');
     input.type = 'text';
     input.value = attr.name;
-
     container.appendChild(input);
 
-   
     if (entity.isRelational) {
-   
         const isNullCheckbox = document.createElement('input');
         isNullCheckbox.type = 'checkbox';
         isNullCheckbox.checked = attr.isNull;
         isNullCheckbox.addEventListener('change', () => {
             attr.isNull = isNullCheckbox.checked;
-            onSave(attr);  
+            onSave(attr);
         });
+        container.appendChild(document.createTextNode(' Is Null '));
+        container.appendChild(isNullCheckbox);
 
-        
         const isForeignKeyCheckbox = document.createElement('input');
         isForeignKeyCheckbox.type = 'checkbox';
         isForeignKeyCheckbox.checked = attr.isForeignKey;
         isForeignKeyCheckbox.addEventListener('change', () => {
             attr.isForeignKey = isForeignKeyCheckbox.checked;
-            onSave(attr);  
+            onSave(attr);
         });
-
-   
-        container.appendChild(document.createTextNode(' Is Null '));
-        container.appendChild(isNullCheckbox);
         container.appendChild(document.createTextNode(' Foreign Key '));
         container.appendChild(isForeignKeyCheckbox);
-    }
 
+        const typeSelect = document.createElement('select');
+        const typeOptions = ['int', 'nvarchar', 'money'];
+        typeOptions.forEach(type => {
+            const option = document.createElement('option');
+            option.value = type;
+            option.textContent = type.toUpperCase();
+            if (attr.type === type) {
+                option.selected = true;
+            }
+            typeSelect.appendChild(option);
+        });
+        typeSelect.addEventListener('change', () => {
+            attr.type = typeSelect.value;
+            onSave(attr);
+            updateLengthInputVisibility(attr.type);
+        });
+        container.appendChild(document.createTextNode(' Type: '));
+        container.appendChild(typeSelect);
+
+        const lengthInputContainer = document.createElement('div');
+        lengthInputContainer.id = 'lengthInputContainer';
+        lengthInputContainer.style.display = (attr.type === 'int' || attr.type === 'nvarchar') ? 'block' : 'none';
+
+        const lengthLabel = document.createElement('label');
+        lengthLabel.setAttribute('for', 'attributeLength');
+        lengthLabel.textContent = 'Length:';
+        lengthInputContainer.appendChild(lengthLabel);
+
+        const lengthInput = document.createElement('input');
+        lengthInput.type = 'number';
+        lengthInput.id = 'attributeLength';
+        lengthInput.placeholder = 'Length (for int, nvarchar)';
+        lengthInput.value = attr.length || '';
+        lengthInput.addEventListener('input', () => {
+            attr.length = lengthInput.value;
+            onSave(attr);
+        });
+        lengthInputContainer.appendChild(lengthInput);
+
+        container.appendChild(lengthInputContainer);
+    }
 
     input.addEventListener('input', () => {
         attr.name = input.value;
-        onSave(attr);  
+        onSave(attr);
     });
 
     return container;
+}
+
+function updateLengthInputVisibility(type) {
+    const lengthInputContainer = document.getElementById('lengthInputContainer');
+    if (lengthInputContainer) {
+        lengthInputContainer.style.display = (type === 'int' || type === 'nvarchar') ? 'block' : 'none';
+    }
 }
 
 document.getElementById('addNewIdentifierButton').addEventListener('click', () => {
@@ -1263,16 +1336,23 @@ document.getElementById('addNewIdentifierButton').addEventListener('click', () =
 
 document.getElementById('addNewAttributeButton').addEventListener('click', () => {
     const newAttributeInput = document.getElementById('newAttributeInput');
-    const newAttribute = newAttributeInput.value.trim();
-    const isNull = document.getElementById('isNull').checked; 
-    const isForeignKey = document.getElementById('isForeignKey').checked; 
+    const newAttributeName = newAttributeInput.value.trim();
     
-    if (newAttribute && selectedEntity) {
-        selectedEntity.addElement(newAttribute, false, isNull, isForeignKey); 
+    const isNull = document.getElementById('isNull').checked; 
+    const isForeignKey = document.getElementById('isForeignKey').checked;
+    const attributeType = document.getElementById('attributeTypeSelect').value;  
+    const length = document.getElementById('attributeLength').value.trim(); 
+
+    if (newAttributeName && selectedEntity) {
+        selectedEntity.addElement(newAttributeName, false, isNull, isForeignKey, attributeType, length);
+        
         displaySelectedEntityData(selectedEntity); 
+        
         newAttributeInput.value = ''; 
+        document.getElementById('attributeLength').value = '';  
     }
 });
+
 
 
 document.getElementById('selectedEntityNameInput').addEventListener('input', (event) => {

@@ -58,10 +58,21 @@
         <div id="relationalAttributes" style="display: none;">
             <label><input type="checkbox" id="isNull"> NULL</label>
             <label><input type="checkbox" id="isForeignKey"> Foreign Key</label>
+
+            <h5>Attribute Type</h5>
+            <select id="attributeTypeSelect">
+                <option value="int">INT</option>
+                <option value="nvarchar">NVARCHAR</option>
+                <option value="money">MONEY</option>
+            </select>
+            <div id="lengthInputContainer" style="display: none;">
+                <label for="attributeLength">Length</label>
+                <input type="number" id="attributeLength" placeholder="Length (for int, nvarchar)">
+            </div>
         </div>
 
         <button id="addNewAttributeButton" class="addButton">Add New Attribute</button>
-    </div>
+        </div>
 
     </div>
 
