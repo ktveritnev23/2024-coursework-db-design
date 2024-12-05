@@ -45,17 +45,24 @@
 
         <!-- Параметры выбранной сущности -->
         <div id="selectedEntityData" style="display: none;">
-            <input type="text" id="selectedEntityNameInput" placeholder="Entity name">
+        <input type="text" id="selectedEntityNameInput" placeholder="Entity name">
         
-            <div id="selectedIdentifiersList"></div>
-            <input type="text" id="newIdentifierInput" placeholder="Enter new identifier">
-            <button id="addNewIdentifierButton" class="addButton">Add New Identifier</button>
-            
-            <div id="selectedAttributesList"></div>
-            <input type="text" id="newAttributeInput" placeholder="Enter new attribute">
-            <button id="addNewAttributeButton" class="addButton">Add New Attribute</button>
-    
+        <div id="selectedIdentifiersList"></div>
+        <input type="text" id="newIdentifierInput" placeholder="Enter new identifier">
+        <button id="addNewIdentifierButton" class="addButton">Add New Identifier</button>
+        
+        <div id="selectedAttributesList"></div>
+        <input type="text" id="newAttributeInput" placeholder="Enter new attribute">
+        
+        <!-- Параметры для реляционных сущностей -->
+        <div id="relationalAttributes" style="display: none;">
+            <label><input type="checkbox" id="isNull"> NULL</label>
+            <label><input type="checkbox" id="isForeignKey"> Foreign Key</label>
         </div>
+
+        <button id="addNewAttributeButton" class="addButton">Add New Attribute</button>
+    </div>
+
     </div>
 
     <svg id="svgContainer"></svg>

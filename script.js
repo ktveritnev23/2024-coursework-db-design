@@ -75,6 +75,7 @@ class Entity {
 
     handleEntityClick(event) {
         this.graph.selectEntity(this);
+        console.log("Attributes of entity:", this.attributes);
         event.stopPropagation();
     }
 
@@ -195,10 +196,16 @@ class Entity {
         event.stopPropagation();
     }
  
-    addElement(name, isIdentifier = false) {
-        this.attributes.push({ name, isIdentifier });
+    addElement(name, isIdentifier = false, isNull = false, isForeignKey = false) {
+        this.attributes.push({
+            name,
+            isIdentifier,
+            isNull,        
+            isForeignKey  
+        });
         this.updateAttributesOnCanvas();
     }
+    
     updateSeparator() {
         if (this.separator) {
             this.element.removeChild(this.separator);
@@ -1109,7 +1116,6 @@ document.getElementById('fileInput').addEventListener('change', (event) => {
     }
 });
 
-// Обновить отображение идентификаторов
 function updateIdentifiersList() {
     const identifiersList = document.getElementById('identifiersList');
     identifiersList.innerHTML = '';
@@ -1120,7 +1126,6 @@ function updateIdentifiersList() {
     });
 }
 
-// Обновить отображение атрибутов
 function updateAttributesList() {
     const attributesList = document.getElementById('attributesList');
     attributesList.innerHTML = '';
@@ -1131,7 +1136,6 @@ function updateAttributesList() {
     });
 }
 
-// Создать сущность 
 document.getElementById('createEntityButton').addEventListener('click', () => {
     const selectedType = document.querySelector('input[name="entityType"]:checked').value;
     const isStrong = selectedType === 'strong';
@@ -1147,7 +1151,6 @@ document.getElementById('createEntityButton').addEventListener('click', () => {
     
     graphHandler.addEntity(newEntity);
 
-    // Скрыть меню 
     document.getElementById('entityOptions').style.display = 'none';
     identifiers = [];
     attributes = [];
@@ -1158,7 +1161,6 @@ document.getElementById('createEntityButton').addEventListener('click', () => {
 
 let selectedEntity = null;
 
-// Отобразить данные выбранной сущности на панели
 function displaySelectedEntityData(entity) {
     selectedEntity = entity;
     const selectedEntityData = document.getElementById('selectedEntityData');
@@ -1176,43 +1178,79 @@ function displaySelectedEntityData(entity) {
     selectedIdentifiersList.innerHTML = '<h5>Identifiers</h5>';
     selectedAttributesList.innerHTML = '<h5>Attributes</h5>';
 
+    const relationalAttributes = document.getElementById('relationalAttributes');
+    if (entity.isRelational) {
+        relationalAttributes.style.display = 'block';
+    } else {
+        relationalAttributes.style.display = 'none';
+    }
+
     entity.attributes.forEach((attr, index) => {
         if (attr.isIdentifier) {
-            const item = createEditableItem(attr.name, (newName) => {
-                entity.attributes[index].name = newName;
+            const item = createEditableItem(attr, (updatedAttr) => {
+                entity.attributes[index] = updatedAttr;
                 entity.updateAttributesOnCanvas();
-            });
+            }, entity); 
             selectedIdentifiersList.appendChild(item);
         }
     });
 
     entity.attributes.forEach((attr, index) => {
         if (!attr.isIdentifier) {
-            const item = createEditableItem(attr.name, (newName) => {
-                entity.attributes[index].name = newName;
-                entity.updateAttributesOnCanvas(); 
-            });
+            const item = createEditableItem(attr, (updatedAttr) => {
+                entity.attributes[index] = updatedAttr;
+                entity.updateAttributesOnCanvas();
+            }, entity);  
             selectedAttributesList.appendChild(item);
         }
     });
 }
 
-function createEditableItem(value, onSave) {
+function createEditableItem(attr, onSave, entity) {
     const container = document.createElement('div');
+
     const input = document.createElement('input');
     input.type = 'text';
-    input.value = value;
-
-    input.addEventListener('input', () => {
-        onSave(input.value);
-    });
+    input.value = attr.name;
 
     container.appendChild(input);
+
+   
+    if (entity.isRelational) {
+   
+        const isNullCheckbox = document.createElement('input');
+        isNullCheckbox.type = 'checkbox';
+        isNullCheckbox.checked = attr.isNull;
+        isNullCheckbox.addEventListener('change', () => {
+            attr.isNull = isNullCheckbox.checked;
+            onSave(attr);  
+        });
+
+        
+        const isForeignKeyCheckbox = document.createElement('input');
+        isForeignKeyCheckbox.type = 'checkbox';
+        isForeignKeyCheckbox.checked = attr.isForeignKey;
+        isForeignKeyCheckbox.addEventListener('change', () => {
+            attr.isForeignKey = isForeignKeyCheckbox.checked;
+            onSave(attr);  
+        });
+
+   
+        container.appendChild(document.createTextNode(' Is Null '));
+        container.appendChild(isNullCheckbox);
+        container.appendChild(document.createTextNode(' Foreign Key '));
+        container.appendChild(isForeignKeyCheckbox);
+    }
+
+
+    input.addEventListener('input', () => {
+        attr.name = input.value;
+        onSave(attr);  
+    });
+
     return container;
 }
 
-
-// Добавление новых идентификаторов и атрибутов из панели
 document.getElementById('addNewIdentifierButton').addEventListener('click', () => {
     const newIdentifierInput = document.getElementById('newIdentifierInput');
     const newIdentifier = newIdentifierInput.value.trim();
@@ -1226,12 +1264,16 @@ document.getElementById('addNewIdentifierButton').addEventListener('click', () =
 document.getElementById('addNewAttributeButton').addEventListener('click', () => {
     const newAttributeInput = document.getElementById('newAttributeInput');
     const newAttribute = newAttributeInput.value.trim();
+    const isNull = document.getElementById('isNull').checked; 
+    const isForeignKey = document.getElementById('isForeignKey').checked; 
+    
     if (newAttribute && selectedEntity) {
-        selectedEntity.addElement(newAttribute, false);
-        displaySelectedEntityData(selectedEntity);
-        newAttributeInput.value = '';
+        selectedEntity.addElement(newAttribute, false, isNull, isForeignKey); 
+        displaySelectedEntityData(selectedEntity); 
+        newAttributeInput.value = ''; 
     }
 });
+
 
 document.getElementById('selectedEntityNameInput').addEventListener('input', (event) => {
     if (selectedEntity) {
@@ -1249,7 +1291,6 @@ function resetEntityForm() {
     document.getElementById('entityNameInput').value = ''; 
 }
 
-// Очистка панели
 function clearSelectedEntityData() {
     selectedEntity = null;
     document.getElementById('selectedEntityData').style.display = 'none';
