@@ -15,6 +15,7 @@ class Entity {
         this.connectionPoints = [];
         this.setConnectionPoints();
         this.hasPrimaryAttribute = false;
+        this.separator = null;
     }
     isPointInEntity(px, py) {
         return (
@@ -168,6 +169,7 @@ class Entity {
         });
     
         this.resizeHandle.setAttribute('y', totalHeight - 10);
+        this.updateSeparator();
     }
     
 
@@ -191,6 +193,33 @@ class Entity {
         this.attributes.push({ name, isIdentifier });
         this.updateAttributesOnCanvas();
     }
+    updateSeparator() {
+        if (this.separator) {
+            this.element.removeChild(this.separator);
+        }
+
+        if (this.identifierGroup.children.length > 0 && this.attributeGroup.children.length > 0) {
+            console.log('Number of identifiers:', this.identifierGroup.children.length);
+            console.log('Number of attributes:', this.attributeGroup.children.length);
+            const lastIdentifier = Array.from(this.identifierGroup.children).reverse().find(child => child.tagName === 'rect' && child.classList.contains('table-cell'));
+        const firstAttribute = Array.from(this.attributeGroup.children).find(child => child.tagName === 'rect' && child.classList.contains('table-cell'));
+            console.log('Last Identifier outerHTML:', lastIdentifier.outerHTML);
+            console.log('First Attribute outerHTML:', firstAttribute.outerHTML);
+            
+            const separatorY = parseFloat(lastIdentifier.getAttribute('y')) + parseFloat(lastIdentifier.getAttribute('height'));
+
+            this.separator = this.createSVGElement('line', {
+                x1: 0,
+                y1: separatorY,
+                x2: this.geometry.width,
+                y2: separatorY,
+                stroke: 'black',
+                'stroke-width': '1'
+            });
+
+            this.element.appendChild(this.separator);
+        }
+    }
 
     updateAttributesOnCanvas() {
         this.identifierGroup.innerHTML = '';
@@ -206,8 +235,8 @@ class Entity {
                 height: heightPerAttribute, 
                 y: yPos,
                 fill: this.initialFillColor,
-                stroke: 'black',
-                'stroke-width': '1'
+                stroke: 'none',
+                
             });
             
             const text = this.createSVGElement('text', {
@@ -231,7 +260,10 @@ class Entity {
         this.geometry.height = heightPerAttribute * this.attributes.length;  
         this.rect.setAttribute('height', this.geometry.height);
         this.updateResizeHandlePosition();
+        this.updateAttributePositions();
+        this.updateSeparator();
     }
+    
 
     setConnectionPoints() {
         const { x, y, width, height } = this.geometry;
