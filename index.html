@@ -15,7 +15,7 @@
         <button id="loadGraphButton">Load Graph</button>
         <input type="file" id="fileInput" style="display: none;" />
 
-        <!-- Параметры сущности--> 
+        <!-- Параметры сущности-->
         <div id="entityOptions" style="display: none;">
             <input type="text" id="entityNameInput" placeholder="Enter entity name">
 
@@ -23,6 +23,9 @@
                 <label><input type="radio" name="entityType" value="strong" checked> Strong Entity</label>
                 <label><input type="radio" name="entityType" value="weak"> Weak Entity</label>
             </div>
+
+            <h4>Is Relational</h4>
+            <label><input type="checkbox" id="isRelationalCheckbox"> Relational Entity</label>
 
             <h4>Identifiers</h4>
             <div id="identifiersList"></div>

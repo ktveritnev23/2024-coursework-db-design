@@ -1,10 +1,12 @@
 class Entity {
-    constructor(graph, name, x, y, width, height, isStrong) {
+    constructor(graph, name, x, y, width, height, isStrong, isRelational) {
         this.graph = graph;
         this.geometry = { x, y, width, height };
         this.label = name || 'New Entity';
         this.isStrong = isStrong; 
-        this.initialFillColor = this.isStrong ? '#77dd77' : '#ffc26c';
+        this.isRelational = isRelational;
+        this.initialFillColor = this.isRelational ? '#ffffff' : (this.isStrong ? '#77dd77' : '#ffc26c');
+
         this.element = this.createEntityElement();
         this.attributes = [];
         this.selected = false;
@@ -34,7 +36,7 @@ class Entity {
             height: this.geometry.height, 
             fill: this.initialFillColor, 
             stroke: 'black', 
-            'stroke-width': '1' 
+            'stroke-width': '2' 
         });
     
         this.text = this.createSVGElement('text', { 
@@ -166,13 +168,17 @@ class Entity {
             if (text) {
                 text.setAttribute('y', newYPos + heightPerAttribute / 2); 
             }
+    
+            const keyIcon = text && text.nextElementSibling?.tagName === 'image' ? text.nextElementSibling : null;
+            if (keyIcon) {
+                keyIcon.setAttribute('y', newYPos + (heightPerAttribute - keyIcon.getAttribute('height')) / 2);
+            }
         });
     
         this.resizeHandle.setAttribute('y', totalHeight - 10);
         this.updateSeparator();
     }
     
-
     stopResizing() {
         this.graph.isResizing = false;
         document.removeEventListener('mousemove', this.resize.bind(this));
@@ -224,45 +230,75 @@ class Entity {
     updateAttributesOnCanvas() {
         this.identifierGroup.innerHTML = '';
         this.attributeGroup.innerHTML = '';
-
+    
         const heightPerAttribute = this.geometry.height / (this.attributes.length || 1);
-        
+        const isStrong = this.isStrong;
+    
         this.attributes.forEach((attr, index) => {
             const yPos = heightPerAttribute * index;
+    
+            // Определяем цвет для фона в зависимости от того, является ли атрибут идентификатором и слабым
+            let fillColor = this.initialFillColor; // Значение по умолчанию для обычных атрибутов
+    
+            console.log('attr:', attr);
+            console.log('isStrong:', isStrong);
+
+            if (attr.isIdentifier) {
+                // If the attribute is an identifier
+                if (this.isRelational) {
+                    fillColor = '#B5B5B5'; // Gray for relational entity identifiers
+                } else if (isStrong) {
+                    fillColor = '#228B22'; // Green for strong identifiers
+                } else {
+                    fillColor = '#E9A039'; // Yellow for weak identifiers
+                }
+            }
+    
             const attributeRect = this.createSVGElement('rect', {
                 class: 'table-cell',
                 width: this.geometry.width,
                 height: heightPerAttribute, 
                 y: yPos,
-                fill: this.initialFillColor,
+                fill: fillColor,
                 stroke: 'none',
-                
             });
-            
+    
             const text = this.createSVGElement('text', {
-                x: '5',
+                x: attr.isIdentifier ? '50' : '5', // Сдвигаем текст, если это идентификатор
                 y: yPos + heightPerAttribute / 2, 
                 fill: 'black',
                 'font-size': '12',
-                'text-anchor': 'start'
+                'text-anchor': 'start',
             });
             text.textContent = attr.name;
-
+    
             if (attr.isIdentifier) {
                 this.identifierGroup.appendChild(attributeRect);
                 this.identifierGroup.appendChild(text);
+                if (this.isRelational) {
+                    const keyIcon = this.createSVGElement('image', {
+                        href: './resrcs/key.png',
+                        x: 5, // Координата X для ключика
+                        y: yPos + (heightPerAttribute - 12*2) / 2, // Центрируем ключик по высоте ячейки
+                        width: 12*2,
+                        height: 12*2,
+                    });
+                    this.identifierGroup.appendChild(keyIcon); // Добавляем ключик поверх текста
+                }
             } else {
                 this.attributeGroup.appendChild(attributeRect);
                 this.attributeGroup.appendChild(text);
             }
         });
-
+    
         this.geometry.height = heightPerAttribute * this.attributes.length;  
         this.rect.setAttribute('height', this.geometry.height);
         this.updateResizeHandlePosition();
         this.updateAttributePositions();
         this.updateSeparator();
     }
+    
+    
     
 
     setConnectionPoints() {
@@ -1099,11 +1135,12 @@ function updateAttributesList() {
 document.getElementById('createEntityButton').addEventListener('click', () => {
     const selectedType = document.querySelector('input[name="entityType"]:checked').value;
     const isStrong = selectedType === 'strong';
+    const isRelational = document.getElementById('isRelationalCheckbox').checked;
     const entityName = document.getElementById('entityNameInput').value || 'New Entity';
 
     const centerX = svgContainer.clientWidth / 2;
     const centerY = svgContainer.clientHeight / 2;
-    const newEntity = new Entity(graphHandler, entityName, centerX - 60, centerY - 30, 120, 60, isStrong);
+    const newEntity = new Entity(graphHandler, entityName, centerX - 60, centerY - 30, 120, 60, isStrong, isRelational);
     
     identifiers.forEach(id => newEntity.addElement(id, true));
     attributes.forEach(attr => newEntity.addElement(attr, false));
