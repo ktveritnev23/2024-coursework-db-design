@@ -109,6 +109,7 @@ input[type="text"] {
     border: 1px solid #ccc;
     font-size: 14px;
     margin-left: 10px;
+    margin-right: 20px;
 }
 
 #addIdentifierButton,
@@ -147,5 +148,5 @@ input[type="text"] {
     height: 1px;
     background-color: black;
     margin: 15px 0;
-    position: sticky; /* "липкая" полоса */
+    position: sticky;
 }

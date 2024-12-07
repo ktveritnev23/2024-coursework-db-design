@@ -1209,8 +1209,6 @@ function displaySelectedEntityData(entity) {
 
     const entityNameInput = document.getElementById('selectedEntityNameInput');
     entityNameInput.value = entity.label;
-
-    // Обновляем название сущности в режиме реального времени
     entityNameInput.addEventListener('input', (event) => {
         selectedEntity.label = event.target.value;
         selectedEntity.updateTextPosition();
@@ -1219,31 +1217,88 @@ function displaySelectedEntityData(entity) {
     const selectedIdentifiersList = document.getElementById('selectedIdentifiersList');
     const selectedAttributesList = document.getElementById('selectedAttributesList');
 
-    // Очищаем старые данные из списков перед добавлением новых
     selectedIdentifiersList.innerHTML = '';
     selectedAttributesList.innerHTML = '';
 
-    // Добавляем идентификаторы
+    // Рендерим идентификаторы
     entity.attributes.forEach((attr, index) => {
         if (attr.isIdentifier) {
-            const item = createEditableItem(attr.name, (newName) => {
+            const item = createEditableItemWithDelete(attr.name, (newName) => {
                 entity.attributes[index].name = newName;
                 entity.updateAttributesOnCanvas();
+            }, () => {
+                entity.attributes.splice(index, 1); // Удаляем атрибут
+                entity.updateAttributesOnCanvas();
+                displaySelectedEntityData(entity); // Обновляем список
             });
             selectedIdentifiersList.appendChild(item);
         }
     });
 
-    // Добавляем атрибуты
+    // Рендерим атрибуты
     entity.attributes.forEach((attr, index) => {
         if (!attr.isIdentifier) {
-            const item = createEditableItem(attr.name, (newName) => {
+            const item = createEditableItemWithDelete(attr.name, (newName) => {
                 entity.attributes[index].name = newName;
                 entity.updateAttributesOnCanvas();
+            }, () => {
+                entity.attributes.splice(index, 1); // Удаляем атрибут
+                entity.updateAttributesOnCanvas();
+                displaySelectedEntityData(entity); // Обновляем список
             });
             selectedAttributesList.appendChild(item);
         }
     });
+}
+
+function createEditableItemWithDelete(value, onSave, onDelete) {
+    const container = document.createElement('div');
+    container.style.position = 'relative'; 
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = value;
+    input.style.width = 'calc(100% - 20px)';
+    input.style.boxSizing = 'border-box';
+
+
+    input.addEventListener('input', () => {
+        onSave(input.value);
+    });
+
+    // Кнопка "Удалить"
+    const deleteButton = document.createElement('button');
+    deleteButton.textContent = 'Delete';
+    deleteButton.style.position = 'absolute';
+    deleteButton.style.bottom = '0';
+    deleteButton.style.right = '0';
+    deleteButton.style.backgroundColor = '#ff6b6b';
+    deleteButton.style.color = 'white';
+    deleteButton.style.border = 'none';
+    deleteButton.style.padding = '5px 10px';
+    deleteButton.style.borderRadius = '5px';
+    deleteButton.style.cursor = 'pointer';
+    deleteButton.style.display = 'none'; // Скрываем по умолчанию
+
+    deleteButton.addEventListener('click', (event) => {
+        event.stopPropagation();
+        onDelete();
+    });
+
+    // Показываем кнопку только при клике на поле ввода
+    input.addEventListener('focus', () => {
+        deleteButton.style.display = 'block';
+    });
+
+    input.addEventListener('blur', () => {
+        setTimeout(() => {
+            deleteButton.style.display = 'none'; // Скрываем кнопку, если фокус уходит
+        }, 200); // Задержка, чтобы кнопка успела обработать клик
+    });
+
+    container.appendChild(input);
+    container.appendChild(deleteButton);
+    return container;
 }
 
 
