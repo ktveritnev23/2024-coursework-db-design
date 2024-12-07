@@ -6,7 +6,7 @@ class Entity {
         this.isStrong = isStrong;
         this.isIdentificationDependent = isIdentificationDependent;
         this.initialFillColor = this.isStrong ? '#77dd77' : '#ffc26c';
-        this.borderRadius = isIdentificationDependent ? 10 : 0; 
+        this.borderRadius = isIdentificationDependent ? 10 : 0;
         this.element = this.createEntityElement();
         this.attributes = [];
         this.selected = false;
@@ -138,7 +138,7 @@ class Entity {
             const textWidth = tempText.getBBox().width;
             this.graph.container.removeChild(tempText);
 
-            minWidth = Math.max(minWidth, textWidth + 10); 
+            minWidth = Math.max(minWidth, textWidth + 10);
         });
         return minWidth;
     }
@@ -226,26 +226,24 @@ class Entity {
         this.attributes.push({ name, isIdentifier });
         this.updateAttributesOnCanvas();
     }
+    
 
     updateAttributesOnCanvas() {
-        const cellHeight = 30; 
-    
+        const cellHeight = 30;
+
         this.identifierGroup.innerHTML = '';
         this.attributeGroup.innerHTML = '';
-    
-        let maxWidth = this.geometry.width; 
-    
+
+        let maxWidth = this.geometry.width;
+
         const identifiers = this.attributes.filter(attr => attr.isIdentifier);
         const attributes = this.attributes.filter(attr => !attr.isIdentifier);
-    
-        let yPos = 0; 
-    
-        identifiers.forEach((attr, index) => {
-            const cellColor = this.isStrong ? '#4fc14f' : '#e9a039'; 
-    
-            const isFirst = index === 0;
-            const isLast = index === identifiers.length - 1 && attributes.length === 0;
-    
+
+        let yPos = 0;
+
+        identifiers.forEach(attr => {
+            const cellColor = this.isStrong ? '#4fc14f' : '#e9a039';
+
             const attributeRect = this.createSVGElement('rect', {
                 class: 'table-cell',
                 width: maxWidth,
@@ -253,62 +251,8 @@ class Entity {
                 y: yPos,
                 fill: cellColor,
                 stroke: 'none',
-                rx: isFirst || isLast ? this.borderRadius : 0,
-                ry: isFirst || isLast ? this.borderRadius : 0,
             });
-    
-            const text = this.createSVGElement('text', {
-                x: currentModelType === 'Relational' ? 20 : 5, 
-                y: yPos + cellHeight / 2 + 4,
-                fill: 'black',
-                'font-size': '12',
-                'text-anchor': 'start',
-            });
-            text.textContent = attr.name;
-    
-            if (currentModelType === 'Relational') {
-                const keyIcon = this.createSVGElement('image', {
-                    'xlink:href': './assets/key.png', 
-                    x: 5, 
-                    y: yPos + (cellHeight - 12) / 2, 
-                    width: 12,
-                    height: 12,
-                });
-                this.identifierGroup.appendChild(keyIcon);
-            }
-    
-            this.identifierGroup.appendChild(attributeRect);
-            this.identifierGroup.appendChild(text);
-    
-            const tempText = this.createSVGElement('text', {
-                'font-size': '12',
-                'dominant-baseline': 'middle',
-                'text-anchor': 'start',
-            });
-            tempText.textContent = attr.name;
-            this.graph.container.appendChild(tempText);
-            const textWidth = tempText.getBBox().width;
-            this.graph.container.removeChild(tempText);
-    
-            maxWidth = Math.max(maxWidth, textWidth + 20);
-            yPos += cellHeight; 
-        });
-    
-        attributes.forEach((attr, index) => {
-            const isFirst = identifiers.length === 0 && index === 0;
-            const isLast = index === attributes.length - 1;
-    
-            const attributeRect = this.createSVGElement('rect', {
-                class: 'table-cell',
-                width: maxWidth,
-                height: cellHeight,
-                y: yPos,
-                fill: this.initialFillColor,
-                stroke: 'none', 
-                rx: isFirst || isLast ? this.borderRadius : 0,
-                ry: isFirst || isLast ? this.borderRadius : 0,
-            });
-    
+
             const text = this.createSVGElement('text', {
                 x: 5,
                 y: yPos + cellHeight / 2 + 4,
@@ -317,10 +261,10 @@ class Entity {
                 'text-anchor': 'start',
             });
             text.textContent = attr.name;
-    
-            this.attributeGroup.appendChild(attributeRect);
-            this.attributeGroup.appendChild(text);
-    
+
+            this.identifierGroup.appendChild(attributeRect);
+            this.identifierGroup.appendChild(text);
+
             const tempText = this.createSVGElement('text', {
                 'font-size': '12',
                 'dominant-baseline': 'middle',
@@ -330,27 +274,57 @@ class Entity {
             this.graph.container.appendChild(tempText);
             const textWidth = tempText.getBBox().width;
             this.graph.container.removeChild(tempText);
-    
+
             maxWidth = Math.max(maxWidth, textWidth + 20);
-            yPos += cellHeight; 
+            yPos += cellHeight;
         });
-    
+
+        attributes.forEach(attr => {
+            const attributeRect = this.createSVGElement('rect', {
+                class: 'table-cell',
+                width: maxWidth,
+                height: cellHeight,
+                y: yPos,
+                fill: this.initialFillColor,
+                stroke: 'none',
+            });
+
+            const text = this.createSVGElement('text', {
+                x: 5,
+                y: yPos + cellHeight / 2 + 4,
+                fill: 'black',
+                'font-size': '12',
+                'text-anchor': 'start',
+            });
+            text.textContent = attr.name;
+
+            this.attributeGroup.appendChild(attributeRect);
+            this.attributeGroup.appendChild(text);
+
+            const tempText = this.createSVGElement('text', {
+                'font-size': '12',
+                'dominant-baseline': 'middle',
+                'text-anchor': 'start',
+            });
+            tempText.textContent = attr.name;
+            this.graph.container.appendChild(tempText);
+            const textWidth = tempText.getBBox().width;
+            this.graph.container.removeChild(tempText);
+
+            maxWidth = Math.max(maxWidth, textWidth + 20);
+            yPos += cellHeight;
+        });
+
         this.geometry.width = maxWidth;
         this.geometry.height = yPos;
         this.rect.setAttribute('width', maxWidth);
         this.rect.setAttribute('height', this.geometry.height);
-    
-        this.rect.setAttribute('width', maxWidth);
-        this.rect.setAttribute('height', this.geometry.height);
-        this.rect.setAttribute('fill', 'none'); 
-        this.rect.setAttribute('stroke', 'black'); 
-        this.rect.setAttribute('stroke-width', '1');
-    
-        this.element.appendChild(this.rect);
-    
+
         this.updateResizeHandlePosition();
     }
-    
+
+
+
     setConnectionPoints() {
         const { x, y, width, height } = this.geometry;
         this.connectionPoints = [
@@ -1158,7 +1132,7 @@ document.getElementById('addAttributeButton').addEventListener('click', () => {
 
 
 document.getElementById('downloadButton').addEventListener('click', () => {
-    graphHandler.saveGraphState();  
+    graphHandler.saveGraphState();
 });
 document.getElementById('uploadButton').addEventListener('click', () => {
     document.getElementById('fileInput').click();
@@ -1235,6 +1209,8 @@ function displaySelectedEntityData(entity) {
 
     const entityNameInput = document.getElementById('selectedEntityNameInput');
     entityNameInput.value = entity.label;
+
+    // Обновляем название сущности в режиме реального времени
     entityNameInput.addEventListener('input', (event) => {
         selectedEntity.label = event.target.value;
         selectedEntity.updateTextPosition();
@@ -1243,7 +1219,11 @@ function displaySelectedEntityData(entity) {
     const selectedIdentifiersList = document.getElementById('selectedIdentifiersList');
     const selectedAttributesList = document.getElementById('selectedAttributesList');
 
+    // Очищаем старые данные из списков перед добавлением новых
+    selectedIdentifiersList.innerHTML = '';
+    selectedAttributesList.innerHTML = '';
 
+    // Добавляем идентификаторы
     entity.attributes.forEach((attr, index) => {
         if (attr.isIdentifier) {
             const item = createEditableItem(attr.name, (newName) => {
@@ -1254,6 +1234,7 @@ function displaySelectedEntityData(entity) {
         }
     });
 
+    // Добавляем атрибуты
     entity.attributes.forEach((attr, index) => {
         if (!attr.isIdentifier) {
             const item = createEditableItem(attr.name, (newName) => {
@@ -1264,6 +1245,7 @@ function displaySelectedEntityData(entity) {
         }
     });
 }
+
 
 function createEditableItem(value, onSave) {
     const container = document.createElement('div');
@@ -1292,7 +1274,7 @@ document.getElementById('addNewIdentifierButton').addEventListener('click', () =
         tempText.setAttribute('font-size', '12');
         tempText.textContent = newIdentifier;
         document.getElementById('svgContainer').appendChild(tempText);
-        const textWidth = tempText.getBBox().width + 20; 
+        const textWidth = tempText.getBBox().width + 20;
         document.getElementById('svgContainer').removeChild(tempText);
 
         if (textWidth > selectedEntity.geometry.width) {
@@ -1318,7 +1300,7 @@ document.getElementById('addNewAttributeButton').addEventListener('click', () =>
         tempText.setAttribute('font-size', '12');
         tempText.textContent = newAttribute;
         document.getElementById('svgContainer').appendChild(tempText);
-        const textWidth = tempText.getBBox().width + 20; 
+        const textWidth = tempText.getBBox().width + 20;
         document.getElementById('svgContainer').removeChild(tempText);
 
         if (textWidth > selectedEntity.geometry.width) {
@@ -1376,24 +1358,6 @@ document.getElementById('addEdgeButton').addEventListener('click', () => {
     graphHandler.addEdgeStandalone(startX, startY, endX, endY);
 });
 
-
-let currentModelType = 'ER'; 
-
-document.querySelectorAll('input[name="modelType"]').forEach((radio) => {
-    radio.addEventListener('change', (event) => {
-        currentModelType = event.target.value;
-        updateAllEntities();
-    });
-});
-
-// обновление отображения сущностей
-function updateAllEntities() {
-    graphHandler.cells.forEach((entity) => {
-        if (entity instanceof Entity) {
-            entity.updateAttributesOnCanvas(); 
-        }
-    });
-}
 
 
 //////////////// пример работы /////////////////

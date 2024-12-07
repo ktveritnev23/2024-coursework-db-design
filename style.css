@@ -24,7 +24,7 @@
     width: 5px;
 }
 
-sidebar::-webkit-scrollbar-thumb {
+.sidebar::-webkit-scrollbar-thumb {
     background: #ccc; 
     border-radius: 10px;
 }
@@ -147,4 +147,5 @@ input[type="text"] {
     height: 1px;
     background-color: black;
     margin: 15px 0;
+    position: sticky; /* "липкая" полоса */
 }
