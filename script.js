@@ -1,9 +1,10 @@
 class Entity {
-    constructor(graph, name, x, y, width, height, isStrong, isIdentificationDependent = false) {
+    constructor(graph, name, x, y, width, height, isStrong, isIdentificationDependent = false, isRelational = false) {
         this.graph = graph;
         this.geometry = { x, y, width, height };
         this.label = name || 'New Entity';
         this.isStrong = isStrong;
+        this.isRelational = isRelational;
         this.isIdentificationDependent = isIdentificationDependent;
         this.initialFillColor = this.isStrong ? '#77dd77' : '#ffc26c';
         this.borderRadius = isIdentificationDependent ? 10 : 0;
@@ -78,6 +79,8 @@ class Entity {
     handleEntityClick(event) {
         this.graph.selectEntity(this);
         event.stopPropagation();
+        deleteEntityButton.style.display = 'block';
+
     }
 
 
@@ -128,20 +131,28 @@ class Entity {
 
     calculateMinWidth() {
         let minWidth = 0;
+
         this.attributes.forEach(attr => {
+            const fullText = this.isRelational
+                ? `${attr.name}: ${attr.type || ''}${['int', 'nvarchar'].includes(attr.type) && attr.length ? `(${attr.length})` : ''}${attr.isNull ? ' NULL' : ' NOT NULL'}${attr.isForeignKey ? ' (FK)' : ''}`
+                : attr.name;
+
             const tempText = this.createSVGElement('text', {
                 'font-size': '12',
-                'dominant-baseline': 'middle'
+                'dominant-baseline': 'middle',
             });
-            tempText.textContent = attr.name;
+            tempText.textContent = fullText;
             this.graph.container.appendChild(tempText);
+
             const textWidth = tempText.getBBox().width;
             this.graph.container.removeChild(tempText);
 
-            minWidth = Math.max(minWidth, textWidth + 10);
+            minWidth = Math.max(minWidth, textWidth + 30);
         });
+
         return minWidth;
     }
+
 
     calculateMinHeight() {
         const tempText = this.createSVGElement('text', {
@@ -169,7 +180,9 @@ class Entity {
         this.resizeHandle.setAttribute('y', newHeight - 10);
         this.updateResizeHandlePosition();
         this.updateAttributePositions();
+        this.centerKeyIcons();
     }
+
 
     updateAttributeWidth(newWidth) {
         const attributeRects = this.element.querySelectorAll('.table-cell');
@@ -222,11 +235,18 @@ class Entity {
         event.stopPropagation();
     }
 
-    addElement(name, isIdentifier = false) {
-        this.attributes.push({ name, isIdentifier });
+    addElement(name, isIdentifier = false, isNull = false, isForeignKey = false, type = 'nvarchar', length = undefined) {
+        this.attributes.push({
+            name,
+            isIdentifier,
+            isNull,
+            isForeignKey,
+            type,
+            length
+        });
         this.updateAttributesOnCanvas();
     }
-    
+
 
     updateAttributesOnCanvas() {
         const cellHeight = 30;
@@ -234,7 +254,7 @@ class Entity {
         this.identifierGroup.innerHTML = '';
         this.attributeGroup.innerHTML = '';
 
-        let maxWidth = this.geometry.width;
+        let maxWidth = Math.max(this.geometry.width, this.calculateMinWidth()); // Учитываем минимальную ширину
 
         const identifiers = this.attributes.filter(attr => attr.isIdentifier);
         const attributes = this.attributes.filter(attr => !attr.isIdentifier);
@@ -243,6 +263,9 @@ class Entity {
 
         identifiers.forEach(attr => {
             const cellColor = this.isStrong ? '#4fc14f' : '#e9a039';
+            const fullText = this.isRelational
+                ? `${attr.name}: ${attr.type || ''}${['int', 'nvarchar'].includes(attr.type) && attr.length ? `(${attr.length})` : ''}${attr.isNull ? ' NULL' : ' NOT NULL'}${attr.isForeignKey ? ' (FK)' : ''}`
+                : attr.name;
 
             const attributeRect = this.createSVGElement('rect', {
                 class: 'table-cell',
@@ -254,32 +277,38 @@ class Entity {
             });
 
             const text = this.createSVGElement('text', {
-                x: 5,
+                x: this.isRelational ? 20 : 5,
                 y: yPos + cellHeight / 2 + 4,
                 fill: 'black',
                 'font-size': '12',
                 'text-anchor': 'start',
+                'alignment-baseline': 'middle',
             });
-            text.textContent = attr.name;
+            text.textContent = fullText;
 
             this.identifierGroup.appendChild(attributeRect);
             this.identifierGroup.appendChild(text);
 
-            const tempText = this.createSVGElement('text', {
-                'font-size': '12',
-                'dominant-baseline': 'middle',
-                'text-anchor': 'start',
-            });
-            tempText.textContent = attr.name;
-            this.graph.container.appendChild(tempText);
-            const textWidth = tempText.getBBox().width;
-            this.graph.container.removeChild(tempText);
+            if (this.isRelational) {
+                const keyIcon = this.createSVGElement('image', {
+                    href: './assets/key.png',
+                    x: 5,
+                    y: yPos + (cellHeight - 12) / 2,
+                    width: 12,
+                    height: 12,
+                });
+                this.identifierGroup.appendChild(keyIcon);
+                attributeRect.keyIcon = keyIcon;
+            }
 
-            maxWidth = Math.max(maxWidth, textWidth + 20);
             yPos += cellHeight;
         });
 
         attributes.forEach(attr => {
+            const fullText = this.isRelational
+                ? `${attr.name}: ${attr.type || ''}${['int', 'nvarchar'].includes(attr.type) && attr.length ? `(${attr.length})` : ''}${attr.isNull ? ' NULL' : ' NOT NULL'}${attr.isForeignKey ? ' (FK)' : ''}`
+                : attr.name;
+
             const attributeRect = this.createSVGElement('rect', {
                 class: 'table-cell',
                 width: maxWidth,
@@ -295,23 +324,13 @@ class Entity {
                 fill: 'black',
                 'font-size': '12',
                 'text-anchor': 'start',
+                'alignment-baseline': 'middle',
             });
-            text.textContent = attr.name;
+            text.textContent = fullText;
 
             this.attributeGroup.appendChild(attributeRect);
             this.attributeGroup.appendChild(text);
 
-            const tempText = this.createSVGElement('text', {
-                'font-size': '12',
-                'dominant-baseline': 'middle',
-                'text-anchor': 'start',
-            });
-            tempText.textContent = attr.name;
-            this.graph.container.appendChild(tempText);
-            const textWidth = tempText.getBBox().width;
-            this.graph.container.removeChild(tempText);
-
-            maxWidth = Math.max(maxWidth, textWidth + 20);
             yPos += cellHeight;
         });
 
@@ -603,6 +622,22 @@ class GraphHandler {
         this.selectedEntity.geometry.y = newY;
         this.selectedEntity.element.setAttribute('transform', `translate(${newX}, ${newY})`);
     }
+
+    deleteEntity(entity) {
+        this.cells = this.cells.filter(cell => cell !== entity);
+        this.container.removeChild(entity.element);
+        this.edges = this.edges.filter(edge => {
+            const isConnected = edge.entity1 === entity || edge.entity2 === entity;
+            if (isConnected) {
+                this.container.removeChild(edge.element);
+                if (edge.handle1) this.container.removeChild(edge.handle1);
+                if (edge.handle2) this.container.removeChild(edge.handle2);
+            }
+            return !isConnected;
+        });
+        this.selectionModel.deselect();
+    }
+
 }
 
 class SelectionModel {
@@ -651,6 +686,8 @@ class SelectionModel {
             element.deselect();
         }
         clearSelectedEntityData();
+        deleteEntityButton.style.display = 'none';
+
     }
 
     clearEntitySelection(entity) {
@@ -1099,6 +1136,9 @@ let identifiers = [];
 let attributes = [];
 
 document.getElementById('addEntityButton').addEventListener('click', () => {
+    graphHandler.selectionModel.deselect();
+    deleteEntityButton.style.display = 'none';
+
     const entityOptions = document.getElementById('entityOptions');
     entityOptions.style.display = entityOptions.style.display === 'none' ? 'block' : 'none';
     identifiers = [];
@@ -1116,6 +1156,7 @@ document.getElementById('addIdentifierButton').addEventListener('click', () => {
         identifiers.push(identifier);
         identifierInput.value = '';
         updateIdentifiersList();
+
     }
 });
 
@@ -1175,6 +1216,7 @@ document.getElementById('createEntityButton').addEventListener('click', () => {
 
     let isStrong = false;
     let isIdentificationDependent = false;
+    const isRelational = document.getElementById('relationalEntityCheckbox').checked;
 
     if (selectedType === 'strong') {
         isStrong = true;
@@ -1184,7 +1226,7 @@ document.getElementById('createEntityButton').addEventListener('click', () => {
 
     const centerX = svgContainer.clientWidth / 2;
     const centerY = svgContainer.clientHeight / 2;
-    const newEntity = new Entity(graphHandler, entityName, centerX - 60, centerY - 30, 120, 60, isStrong, isIdentificationDependent);
+    const newEntity = new Entity(graphHandler, entityName, centerX - 60, centerY - 30, 120, 60, isStrong, isIdentificationDependent, isRelational);
 
     identifiers.forEach(id => newEntity.addElement(id, true));
     attributes.forEach(attr => newEntity.addElement(attr, false));
@@ -1196,6 +1238,8 @@ document.getElementById('createEntityButton').addEventListener('click', () => {
     attributes = [];
     updateIdentifiersList();
     updateAttributesList();
+    console.log('Entity created:', newEntity);
+
 });
 
 
@@ -1205,6 +1249,7 @@ let selectedEntity = null;
 function displaySelectedEntityData(entity) {
     selectedEntity = entity;
     const selectedEntityData = document.getElementById('selectedEntityData');
+
     selectedEntityData.style.display = 'block';
 
     const entityNameInput = document.getElementById('selectedEntityNameInput');
@@ -1220,51 +1265,47 @@ function displaySelectedEntityData(entity) {
     selectedIdentifiersList.innerHTML = '';
     selectedAttributesList.innerHTML = '';
 
-    // Рендерим идентификаторы
     entity.attributes.forEach((attr, index) => {
-        if (attr.isIdentifier) {
-            const item = createEditableItemWithDelete(attr.name, (newName) => {
+        const item = createEditableItemWithControls(
+            attr,
+            (newName) => {
                 entity.attributes[index].name = newName;
                 entity.updateAttributesOnCanvas();
-            }, () => {
-                entity.attributes.splice(index, 1); // Удаляем атрибут
+            },
+            () => {
+                entity.attributes.splice(index, 1);
                 entity.updateAttributesOnCanvas();
-                displaySelectedEntityData(entity); // Обновляем список
-            });
-            selectedIdentifiersList.appendChild(item);
-        }
-    });
+                displaySelectedEntityData(entity);
+            },
+            (updatedAttr) => {
+                entity.attributes[index] = { ...entity.attributes[index], ...updatedAttr };
+                entity.updateAttributesOnCanvas();
+            },
+            entity.isRelational
+        );
 
-    // Рендерим атрибуты
-    entity.attributes.forEach((attr, index) => {
-        if (!attr.isIdentifier) {
-            const item = createEditableItemWithDelete(attr.name, (newName) => {
-                entity.attributes[index].name = newName;
-                entity.updateAttributesOnCanvas();
-            }, () => {
-                entity.attributes.splice(index, 1); // Удаляем атрибут
-                entity.updateAttributesOnCanvas();
-                displaySelectedEntityData(entity); // Обновляем список
-            });
+        if (attr.isIdentifier) {
+            selectedIdentifiersList.appendChild(item);
+        } else {
             selectedAttributesList.appendChild(item);
         }
     });
 }
 
-function createEditableItemWithDelete(value, onSave, onDelete) {
+
+function createEditableItemWithControls(attr, onSave, onDelete, onUpdate, isRelational) {
     const container = document.createElement('div');
-    container.style.position = 'relative'; 
+    container.style.position = 'relative';
+    container.style.marginBottom = '10px';
 
     const input = document.createElement('input');
     input.type = 'text';
-    input.value = value;
+    input.value = attr.name;
     input.style.width = 'calc(100% - 20px)';
     input.style.boxSizing = 'border-box';
+    input.addEventListener('input', () => onSave(input.value));
 
-
-    input.addEventListener('input', () => {
-        onSave(input.value);
-    });
+    container.appendChild(input);
 
     // Кнопка "Удалить"
     const deleteButton = document.createElement('button');
@@ -1278,26 +1319,90 @@ function createEditableItemWithDelete(value, onSave, onDelete) {
     deleteButton.style.padding = '5px 10px';
     deleteButton.style.borderRadius = '5px';
     deleteButton.style.cursor = 'pointer';
-    deleteButton.style.display = 'none'; // Скрываем по умолчанию
-
+    deleteButton.style.display = 'none';
     deleteButton.addEventListener('click', (event) => {
         event.stopPropagation();
         onDelete();
     });
 
-    // Показываем кнопку только при клике на поле ввода
     input.addEventListener('focus', () => {
         deleteButton.style.display = 'block';
     });
 
     input.addEventListener('blur', () => {
         setTimeout(() => {
-            deleteButton.style.display = 'none'; // Скрываем кнопку, если фокус уходит
-        }, 200); // Задержка, чтобы кнопка успела обработать клик
+            deleteButton.style.display = 'none';
+        }, 200);
     });
 
-    container.appendChild(input);
+
+    if (isRelational) {
+        // Контейнер для параметров
+        const controls = document.createElement('div');
+        controls.style.marginTop = '5px';
+
+        // Чекбокс для NULL
+        const nullCheckbox = document.createElement('input');
+        nullCheckbox.type = 'checkbox';
+        nullCheckbox.checked = attr.isNull || false;
+        nullCheckbox.addEventListener('change', () => onUpdate({ isNull: nullCheckbox.checked }));
+
+        const nullLabel = document.createElement('label');
+        nullLabel.textContent = 'NULL';
+        nullLabel.style.marginRight = '10px';
+        nullLabel.appendChild(nullCheckbox);
+
+        // Чекбокс для Foreign Key
+        const fkCheckbox = document.createElement('input');
+        fkCheckbox.type = 'checkbox';
+        fkCheckbox.checked = attr.isForeignKey || false;
+        fkCheckbox.addEventListener('change', () => onUpdate({ isForeignKey: fkCheckbox.checked }));
+
+        const fkLabel = document.createElement('label');
+        fkLabel.textContent = 'FK';
+        fkLabel.style.marginRight = '10px';
+        fkLabel.appendChild(fkCheckbox);
+
+        // Выпадающий список для выбора типа
+        const typeSelect = document.createElement('select');
+        ['int', 'nvarchar', 'money'].forEach(type => {
+            const option = document.createElement('option');
+            option.value = type;
+            option.textContent = type.toUpperCase();
+            option.selected = attr.type === type;
+            typeSelect.appendChild(option);
+        });
+
+        typeSelect.addEventListener('change', () => {
+            onUpdate({ type: typeSelect.value });
+            lengthInputContainer.style.display = ['int', 'nvarchar'].includes(typeSelect.value) ? 'block' : 'none';
+        });
+
+        // Поле ввода длины
+        const lengthInputContainer = document.createElement('div');
+        lengthInputContainer.style.display = ['int', 'nvarchar'].includes(attr.type) ? 'block' : 'none';
+        const lengthInputLabel = document.createElement('label');
+        lengthInputLabel.textContent = 'Length: ';
+
+        const lengthInput = document.createElement('input');
+        lengthInput.type = 'number';
+        lengthInput.value = attr.length || '';
+        lengthInput.style.width = '50px';
+        lengthInput.addEventListener('input', () => onUpdate({ length: parseInt(lengthInput.value, 10) || null }));
+
+        lengthInputLabel.appendChild(lengthInput);
+        lengthInputContainer.appendChild(lengthInputLabel);
+
+        // Добавляем элементы управления в контейнер
+        controls.appendChild(nullLabel);
+        controls.appendChild(fkLabel);
+        controls.appendChild(typeSelect);
+        controls.appendChild(lengthInputContainer);
+        container.appendChild(controls);
+    }
+
     container.appendChild(deleteButton);
+
     return container;
 }
 
@@ -1325,18 +1430,6 @@ document.getElementById('addNewIdentifierButton').addEventListener('click', () =
     if (newIdentifier && selectedEntity) {
         selectedEntity.addElement(newIdentifier, true);
 
-        const tempText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        tempText.setAttribute('font-size', '12');
-        tempText.textContent = newIdentifier;
-        document.getElementById('svgContainer').appendChild(tempText);
-        const textWidth = tempText.getBBox().width + 20;
-        document.getElementById('svgContainer').removeChild(tempText);
-
-        if (textWidth > selectedEntity.geometry.width) {
-            selectedEntity.geometry.width = textWidth;
-            selectedEntity.rect.setAttribute('width', textWidth);
-        }
-
         selectedEntity.updateAttributesOnCanvas();
 
         displaySelectedEntityData(selectedEntity);
@@ -1350,19 +1443,7 @@ document.getElementById('addNewAttributeButton').addEventListener('click', () =>
 
     if (newAttribute && selectedEntity) {
         selectedEntity.addElement(newAttribute, false);
-
-        const tempText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        tempText.setAttribute('font-size', '12');
-        tempText.textContent = newAttribute;
-        document.getElementById('svgContainer').appendChild(tempText);
-        const textWidth = tempText.getBBox().width + 20;
-        document.getElementById('svgContainer').removeChild(tempText);
-
-        if (textWidth > selectedEntity.geometry.width) {
-            selectedEntity.geometry.width = textWidth;
-            selectedEntity.rect.setAttribute('width', textWidth);
-        }
-
+       
         selectedEntity.updateAttributesOnCanvas();
 
         displaySelectedEntityData(selectedEntity);
@@ -1397,6 +1478,9 @@ function clearSelectedEntityData() {
 }
 
 document.getElementById('addEdgeButton').addEventListener('click', () => {
+    graphHandler.selectionModel.deselect();
+    deleteEntityButton.style.display = 'none';
+
     const svgWidth = svgContainer.clientWidth;
     const svgHeight = svgContainer.clientHeight;
 
@@ -1413,6 +1497,70 @@ document.getElementById('addEdgeButton').addEventListener('click', () => {
     graphHandler.addEdgeStandalone(startX, startY, endX, endY);
 });
 
+function updateRelationalAttribute(attr, newParams) {
+    Object.assign(attr, newParams); 
+    selectedEntity.updateAttributesOnCanvas(); 
+}
+
+document.getElementById('relationalEntityCheckbox').addEventListener('change', (event) => {
+    if (selectedEntity) {
+        selectedEntity.isRelational = event.target.checked;
+        document.getElementById('relationalAttributes').style.display = event.target.checked ? 'block' : 'none';
+        selectedEntity.updateAttributesOnCanvas();
+    }
+});
+
+document.getElementById('selectedAttributesList').addEventListener('click', (event) => {
+    const relationalAttributesPanel = document.getElementById('relationalAttributes');
+    relationalAttributesPanel.style.display = selectedEntity.isRelational ? 'block' : 'none';
+
+    // Заполняем данные для редактирования
+    if (event.target.tagName === 'INPUT') {
+        const selectedAttr = selectedEntity.attributes.find(attr => attr.name === event.target.value);
+        if (selectedAttr) {
+            document.getElementById('isNull').checked = selectedAttr.isNull || false;
+            document.getElementById('isForeignKey').checked = selectedAttr.isForeignKey || false;
+            document.getElementById('attributeTypeSelect').value = selectedAttr.type || '';
+            document.getElementById('attributeLength').value = selectedAttr.length || '';
+        }
+    }
+});
+
+
+document.getElementById('attributeTypeSelect').addEventListener('change', (event) => {
+    const newType = event.target.value;
+    updateRelationalAttribute(selectedAttribute, { type: newType });
+    selectedEntity.updateAttributesOnCanvas();
+});
+
+document.getElementById('isNull').addEventListener('change', (event) => {
+    const isNullChecked = event.target.checked;
+    updateRelationalAttribute(selectedAttribute, { isNull: isNullChecked });
+    selectedEntity.updateAttributesOnCanvas();
+});
+
+document.getElementById('attributeLength').addEventListener('input', (event) => {
+    const lengthValue = parseInt(event.target.value, 10);
+    updateRelationalAttribute(selectedAttribute, { length: lengthValue });
+    selectedEntity.updateAttributesOnCanvas();
+});
+
+document.getElementById('isForeignKey').addEventListener('change', (event) => {
+    const isForeignKeyChecked = event.target.checked;
+    updateRelationalAttribute(selectedAttribute, { isForeignKey: isForeignKeyChecked });
+    selectedEntity.updateAttributesOnCanvas();
+});
+
+
+const deleteEntityButton = document.getElementById('deleteEntityButton');
+
+deleteEntityButton.addEventListener('click', () => {
+    if (selectedEntity) {
+        graphHandler.deleteEntity(selectedEntity);
+        clearSelectedEntityData();
+        deleteEntityButton.style.display = 'none';
+    }
+});
 
 
 //////////////// пример работы /////////////////

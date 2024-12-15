@@ -1,5 +1,5 @@
 #svgContainer {
-    width: 100%; 
+    width: 100%;
     height: 100vh;
 }
 
@@ -16,7 +16,7 @@
     padding-top: 20px;
     box-shadow: 2px 0 5px rgba(0, 0, 0, 0.2);
     font-family: sans-serif;
-    overflow-y: auto; 
+    overflow-y: auto;
     overflow-x: hidden;
 }
 
@@ -25,16 +25,16 @@
 }
 
 .sidebar::-webkit-scrollbar-thumb {
-    background: #ccc; 
+    background: #ccc;
     border-radius: 10px;
 }
 
 .sidebar::-webkit-scrollbar-thumb:hover {
-    background: #aaa; 
+    background: #aaa;
 }
 
 .sidebar::-webkit-scrollbar-track {
-    background: #f0f0f0; 
+    background: #f0f0f0;
 }
 
 #modelTypeSelection {
@@ -52,13 +52,13 @@
 
 #downloadButton,
 #uploadButton {
-    font-size: 14px; 
+    font-size: 14px;
     color: white;
-    background-color: #9370db; 
-    border: 2px solid #5d3fd3; 
-    border-radius: 8px; 
-    padding: 8px 15px; 
-    width: 90%; 
+    background-color: #9370db;
+    border: 2px solid #5d3fd3;
+    border-radius: 8px;
+    padding: 8px 15px;
+    width: 90%;
     margin: 10px 0;
     cursor: pointer;
     text-align: center;
@@ -66,18 +66,18 @@
 
 #downloadButton:hover,
 #uploadButton:hover {
-    background-color: #bba3e0; 
+    background-color: #bba3e0;
 }
 
 #addEntityButton,
 #addEdgeButton {
     font-size: 16px;
     color: white;
-    background-color: #87ceeb; 
-    border: 2px solid #4682b4; 
+    background-color: #87ceeb;
+    border: 2px solid #4682b4;
     border-radius: 8px;
     padding: 10px 15px;
-    width: 90%; 
+    width: 90%;
     margin: 10px 0;
     cursor: pointer;
     text-align: center;
@@ -85,7 +85,7 @@
 
 #addEntityButton:hover,
 #addEdgeButton:hover {
-    background-color: #add8e6; 
+    background-color: #add8e6;
 }
 
 h4 {
@@ -98,7 +98,7 @@ h4 {
 
 .entity-type-options label {
     display: block;
-    margin-left: 20px; 
+    margin-left: 20px;
 }
 
 input[type="text"] {
@@ -109,28 +109,27 @@ input[type="text"] {
     border: 1px solid #ccc;
     font-size: 14px;
     margin-left: 10px;
-    margin-right: 20px;
 }
 
 #addIdentifierButton,
 #addAttributeButton,
 #addNewIdentifierButton,
 #addNewAttributeButton {
-    width: 85%; 
+    width: 85%;
     margin: 5px 0;
     padding: 8px;
     cursor: pointer;
-    border-radius: 8px; 
-    background-color: #dcdcdc; 
-    border: 1px solid #a9a9a9; 
+    border-radius: 8px;
+    background-color: #dcdcdc;
+    border: 1px solid #a9a9a9;
     margin-left: 10px;
 }
 
 #createEntityButton {
     font-size: 16px;
     color: white;
-    background-color: #800000; 
-    border: 2px solid #4b0000; 
+    background-color: #800000;
+    border: 2px solid #4b0000;
     border-radius: 8px;
     padding: 10px 15px;
     width: 90%;
@@ -140,7 +139,7 @@ input[type="text"] {
 }
 
 #createEntityButton:hover {
-    background-color: #a52a2a; 
+    background-color: #a52a2a;
 }
 
 .separator {
@@ -149,4 +148,38 @@ input[type="text"] {
     background-color: black;
     margin: 15px 0;
     position: sticky;
+}
+
+#optionsPanel {
+    z-index: 10;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    border-radius: 4px;
+}
+
+#optionsPanel button {
+    display: block;
+    margin: 5px 0;
+    padding: 5px 10px;
+    background-color: #87ceeb;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+#optionsPanel button:hover {
+    background-color: #add8e6;
+}
+
+#deleteEntityButton {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    display: none;
+    background-color: #ff6b6b;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 5px;
+    cursor: pointer;
 }

@@ -15,17 +15,22 @@
         <div class="separator"></div>
 
         <button id="addEntityButton">Add Entity</button>
-        
+
         <input type="file" id="fileInput" style="display: none;" />
 
-        <!-- Параметры сущности--> 
+        <!-- Параметры сущности-->
         <div id="entityOptions" style="display: none;">
             <input type="text" id="entityNameInput" placeholder="Enter entity name">
 
             <div class="entity-type-options">
                 <label><input type="radio" name="entityType" value="strong" checked> Strong Entity</label>
                 <label><input type="radio" name="entityType" value="weak"> Weak Entity</label>
-                <label><input type="radio" name="entityType" value="identificationDependent"> ID-Dependent Entity</label>
+                <label><input type="radio" name="entityType" value="identificationDependent"> ID-Dependent
+                    Entity</label>
+            </div>
+
+            <div>
+                <label><input type="checkbox" id="relationalEntityCheckbox"> Relational Entity</label>
             </div>
 
             <h4>Identifiers</h4>
@@ -41,24 +46,50 @@
             <button id="createEntityButton">Create Entity</button>
         </div>
 
-        <button id="addEdgeButton">Add Edge</button>
+
 
         <!-- Параметры выбранной сущности -->
         <div id="selectedEntityData" style="display: none;">
             <input type="text" id="selectedEntityNameInput" placeholder="Entity name">
-        
+
             <h4>Identifiers</h4>
             <div id="selectedIdentifiersList"></div>
             <input type="text" id="newIdentifierInput" placeholder="Enter new identifier">
             <button id="addNewIdentifierButton" class="addButton">Add New Identifier</button>
-            
+
             <h4>Attributes</h4>
             <div id="selectedAttributesList"></div>
             <input type="text" id="newAttributeInput" placeholder="Enter new attribute">
             <button id="addNewAttributeButton" class="addButton">Add New Attribute</button>
-    
+
+            <!-- Checkbox для реляционной модели -->
+
+            <div id="relationalAttributes" style="display: none;">
+                <label><input type="checkbox" id="isNull"> NULL</label>
+                <label><input type="checkbox" id="isForeignKey"> Foreign Key</label>
+                <h5>Attribute Type</h5>
+
+                <select id="attributeTypeSelect">
+                    <option value="int">INT</option>
+                    <option value="nvarchar">NVARCHAR</option>
+                    <option value="money">MONEY</option>
+                </select>
+                <div id="lengthInputContainer" style="display: none;">
+                    <label for="attributeLength">Length</label>
+                    <input type="number" id="attributeLength" placeholder="Length (for int, nvarchar)">
+                </div>
+            </div>
+
         </div>
+
+        <!-- Связи -->
+        <button id="addEdgeButton">Add Edge</button>
+
+
     </div>
+
+    <button id="deleteEntityButton">Delete Entity</button>
+
 
     <svg id="svgContainer"></svg>
     <script src="script.js"></script>
