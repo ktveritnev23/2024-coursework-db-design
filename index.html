@@ -25,8 +25,6 @@
             <div class="entity-type-options">
                 <label><input type="radio" name="entityType" value="strong" checked> Strong Entity</label>
                 <label><input type="radio" name="entityType" value="weak"> Weak Entity</label>
-                <label><input type="radio" name="entityType" value="identificationDependent"> ID-Dependent
-                    Entity</label>
             </div>
 
             <div>
@@ -85,6 +83,25 @@
         <!-- Связи -->
         <button id="addEdgeButton">Add Edge</button>
 
+        <!-- Панель управления для связей -->
+        <div id="handlesOptions" style="display: none;">
+            <h4>Cardinality</h4>
+            <select id="handle1TypeSelect">
+                <option value="oneOptional">One-Optional</option>
+                <option value="manyOptional">Many-Optional</option>
+                <option value="oneMandatory">One-Mandatory</option>
+                <option value="manyMandatory">Many-Mandatory</option>
+            </select>
+
+            <select id="handle2TypeSelect">
+                <option value="oneOptional">One-Optional</option>
+                <option value="manyOptional">Many-Optional</option>
+                <option value="oneMandatory">One-Mandatory</option>
+                <option value="manyMandatory">Many-Mandatory</option>
+            </select>
+
+            <button id="createEdgeButton" style="display: none;">Create Edge</button>
+        </div>
 
     </div>
 

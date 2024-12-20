@@ -1,13 +1,11 @@
 class Entity {
-    constructor(graph, name, x, y, width, height, isStrong, isIdentificationDependent = false, isRelational = false) {
+    constructor(graph, name, x, y, width, height, isStrong, isRelational = false) {
         this.graph = graph;
         this.geometry = { x, y, width, height };
         this.label = name || 'New Entity';
         this.isStrong = isStrong;
         this.isRelational = isRelational;
-        this.isIdentificationDependent = isIdentificationDependent;
         this.initialFillColor = this.isStrong ? '#77dd77' : '#ffc26c';
-        this.borderRadius = isIdentificationDependent ? 10 : 0;
         this.element = this.createEntityElement();
         this.attributes = [];
         this.selected = false;
@@ -180,7 +178,6 @@ class Entity {
         this.resizeHandle.setAttribute('y', newHeight - 10);
         this.updateResizeHandlePosition();
         this.updateAttributePositions();
-        this.centerKeyIcons();
     }
 
 
@@ -572,8 +569,8 @@ class GraphHandler {
         edge.updatePosition();
     }
 
-    addEdgeStandalone(x1, y1, x2, y2) {
-        const edge = new Edge(this, null, null, true);
+    addEdgeStandalone(x1, y1, x2, y2, handle1Type = 'oneOptional', handle2Type = 'manyMandatory') {
+        const edge = new Edge(this, null, null, true, handle1Type, handle2Type);
         edge.setStandalonePosition(x1, y1, x2, y2);
         this.edges.push(edge);
     }
@@ -724,7 +721,7 @@ class SelectionModel {
 }
 
 class Edge {
-    constructor(graph, entity1 = null, entity2 = null, isStandalone = false) {
+    constructor(graph, entity1 = null, entity2 = null, isStandalone = false, handle1Type = 'oneOptional', handle2Type = 'manyMandatory') {
         this.graph = graph;
         this.entity1 = entity1;
         this.entity2 = entity2;
@@ -735,8 +732,8 @@ class Edge {
         this.dragStart = { x: 0, y: 0 };
 
         this.element = this.createEdgeElement();
-        this.handle1 = this.createHandle();
-        this.handle2 = this.createHandle();
+        this.handle1 = this.createHandle(handle1Type);
+        this.handle2 = this.createHandle(handle2Type);
 
         this.graph.container.appendChild(this.element);
         this.graph.container.appendChild(this.handle1);
@@ -753,18 +750,173 @@ class Edge {
     createEdgeElement() {
         const polyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
         polyline.setAttribute('stroke', 'black');
-        polyline.setAttribute('stroke-width', '1');
+        polyline.setAttribute('stroke-width', '1.5');
         polyline.setAttribute('fill', 'none');
         return polyline;
     }
 
-    createHandle() {
-        const handle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-        handle.setAttribute('r', 5);
-        handle.setAttribute('fill', 'red');
-        handle.setAttribute('stroke', 'black');
-        handle.setAttribute('stroke-width', '1');
-        return handle;
+    createHandle(type) {
+        // Создаем группу элементов
+        const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        group.setAttribute('transform', 'translate(0, 0)');
+      
+        // Создаем первую черточку перед кружком
+        if (type === 'manyOptional') {
+            /*const line1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line1.setAttribute('x1', '10'); // Начало линии (настраивается позже)
+            line1.setAttribute('y1', '-5');
+            line1.setAttribute('x2', '10');
+            line1.setAttribute('y2', '5');
+            line1.setAttribute('stroke', 'black');
+            line1.setAttribute('stroke-width', '2');
+          */
+            // Создаем кружок
+            const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            circle.setAttribute('cx', '10');
+            circle.setAttribute('cy', '0');
+            circle.setAttribute('r', '5');
+            circle.setAttribute('stroke', 'black');
+            circle.setAttribute('stroke-width', '1');
+            circle.setAttribute('fill', 'none');
+          
+            // Создаем первую диагональную черточку
+            const line2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line2.setAttribute('x1', '0');
+            line2.setAttribute('y1', '0');
+            line2.setAttribute('x2', '-10'); // Угол π/4 (настраивается позже)
+            line2.setAttribute('y2', '-10');
+            line2.setAttribute('stroke', 'black');
+            line2.setAttribute('stroke-width', '1');
+          
+            // Создаем вторую диагональную черточку
+            const line3 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line3.setAttribute('x1', '0');
+            line3.setAttribute('y1', '0');
+            line3.setAttribute('x2', '-10'); // Угол 5π/4 (настраивается позже)
+            line3.setAttribute('y2', '10');
+            line3.setAttribute('stroke', 'black');
+            line3.setAttribute('stroke-width', '1');
+          
+            // Создаем черточку, которая идет из кружка и совпадает с ребром
+            const line4 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line4.setAttribute('x1', '10');
+            line4.setAttribute('y1', '0');
+            line4.setAttribute('x2', '-10'); // Это будет точка, куда ребро должно направляться, например вправо
+            line4.setAttribute('y2', '0');  // Это будет точка на оси X, при необходимости можно скорректировать для вертикальной оси
+            line4.setAttribute('stroke', 'black');
+            line4.setAttribute('stroke-width', '1');
+          
+            // Добавляем элементы в группу
+            //group.appendChild(line1);
+            group.appendChild(circle);
+            group.appendChild(line2);
+            group.appendChild(line3);
+            group.appendChild(line4);  // Добавляем новую черточку
+        } else if (type === 'oneMandatory') {
+            const line1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line1.setAttribute('x1', '8'); // Начало линии (настраивается позже)
+            line1.setAttribute('y1', '-5');
+            line1.setAttribute('x2', '8');
+            line1.setAttribute('y2', '5');
+            line1.setAttribute('stroke', 'black');
+            line1.setAttribute('stroke-width', '1');
+
+            const line2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line2.setAttribute('x1', '14'); // Начало линии (настраивается позже)
+            line2.setAttribute('y1', '-5');
+            line2.setAttribute('x2', '14');
+            line2.setAttribute('y2', '5');
+            line2.setAttribute('stroke', 'black');
+            line2.setAttribute('stroke-width', '1');
+
+            const line3 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line3.setAttribute('x1', '10');
+            line3.setAttribute('y1', '0');
+            line3.setAttribute('x2', '-10'); // Это будет точка, куда ребро должно направляться, например вправо
+            line3.setAttribute('y2', '0');  // Это будет точка на оси X, при необходимости можно скорректировать для вертикальной оси
+            line3.setAttribute('stroke', 'black');
+            line3.setAttribute('stroke-width', '1');
+
+            group.appendChild(line1);
+            group.appendChild(line2);
+            group.appendChild(line3);
+
+        } else if (type === 'manyMandatory') {
+            const line1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line1.setAttribute('x1', '10'); // Начало линии (настраивается позже)
+            line1.setAttribute('y1', '-5');
+            line1.setAttribute('x2', '10');
+            line1.setAttribute('y2', '5');
+            line1.setAttribute('stroke', 'black');
+            line1.setAttribute('stroke-width', '1');
+    
+            const line2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line2.setAttribute('x1', '0');
+            line2.setAttribute('y1', '0');
+            line2.setAttribute('x2', '-10'); // Угол π/4 (настраивается позже)
+            line2.setAttribute('y2', '-10');
+            line2.setAttribute('stroke', 'black');
+            line2.setAttribute('stroke-width', '1');
+    
+            const line3 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line3.setAttribute('x1', '0');
+            line3.setAttribute('y1', '0');
+            line3.setAttribute('x2', '-10'); // Угол 5π/4 (настраивается позже)
+            line3.setAttribute('y2', '10');
+            line3.setAttribute('stroke', 'black');
+            line3.setAttribute('stroke-width', '1');
+    
+            const line4 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line4.setAttribute('x1', '-5');
+            line4.setAttribute('y1', '0');
+            line4.setAttribute('x2', '-10'); // Это будет точка, куда ребро должно направляться
+            line4.setAttribute('y2', '0');  // Это будет точка на оси X
+            line4.setAttribute('stroke', 'black');
+            line4.setAttribute('stroke-width', '1');
+    
+            const line5 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line5.setAttribute('x1', '10');
+            line5.setAttribute('y1', '0');
+            line5.setAttribute('x2', '-10'); // Это будет точка, куда ребро должно направляться, например вправо
+            line5.setAttribute('y2', '0');  // Это будет точка на оси X, при необходимости можно скорректировать для вертикальной оси
+            line5.setAttribute('stroke', 'black');
+            line5.setAttribute('stroke-width', '1');
+            
+            group.appendChild(line1);
+            group.appendChild(line2);
+            group.appendChild(line3);
+            group.appendChild(line4);
+            group.appendChild(line5);
+        } else if (type === 'oneOptional') {
+            const line1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line1.setAttribute('x1', '10'); // Начало линии (настраивается позже)
+            line1.setAttribute('y1', '-5');
+            line1.setAttribute('x2', '10');
+            line1.setAttribute('y2', '5');
+            line1.setAttribute('stroke', 'black');
+            line1.setAttribute('stroke-width', '1');
+
+            const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            circle.setAttribute('cx', '0');
+            circle.setAttribute('cy', '0');
+            circle.setAttribute('r', '5');
+            circle.setAttribute('stroke', 'black');
+            circle.setAttribute('stroke-width', '1');
+            circle.setAttribute('fill', 'none');
+
+            const line2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line2.setAttribute('x1', '10');
+            line2.setAttribute('y1', '0');
+            line2.setAttribute('x2', '-7'); // Это будет точка, куда ребро должно направляться, например вправо
+            line2.setAttribute('y2', '0');  // Это будет точка на оси X, при необходимости можно скорректировать для вертикальной оси
+            line2.setAttribute('stroke', 'black');
+            line2.setAttribute('stroke-width', '1');
+
+            group.appendChild(line1);
+            group.appendChild(line2);
+            group.appendChild(circle);
+        }      
+        return group;
     }
 
     setStandalonePosition(x1, y1, x2, y2) {
@@ -875,15 +1027,155 @@ class Edge {
 
     updateHandles() {
         const points = this.element.getAttribute('points').split(' ');
+    
         const x1 = parseFloat(points[0].split(',')[0]);
         const y1 = parseFloat(points[0].split(',')[1]);
+    
         const x2 = parseFloat(points[3].split(',')[0]);
         const y2 = parseFloat(points[3].split(',')[1]);
-
-        this.handle1.setAttribute('cx', x1);
-        this.handle1.setAttribute('cy', y1);
-        this.handle2.setAttribute('cx', x2);
-        this.handle2.setAttribute('cy', y2);
+    
+        const offset = 10; 
+    
+        // Перемещаем группы в соответствующие позиции с учетом отступа
+        this.handle1.setAttribute('transform', `translate(${x1}, ${y1})`);
+        this.handle2.setAttribute('transform', `translate(${x2}, ${y2})`);
+    
+        // Если обе сущности привязаны
+        if (this.entity1 && this.entity2) {
+            const side1 = this.entity1.getConnectionPointSide({ x: x1, y: y1 });
+            const side2 = this.entity2.getConnectionPointSide({ x: x2, y: y2 });
+    
+            console.log(`handle1 на стороне: ${side1}, handle2 на стороне: ${side2}`);
+    
+            // Поворот для handle1 (в зависимости от того, на какой стороне entity1)
+            switch (side1) {
+                case 0: // Левая сторона
+                    this.handle1.setAttribute('transform', `translate(${x1 - offset}, ${y1}) rotate(180)`);
+                    console.log("handle1: поворот на 180 градусов (левая сторона)");
+                    break;
+                case 1: // Правая сторона
+                    this.handle1.setAttribute('transform', `translate(${x1 + offset}, ${y1}) rotate(0)`);
+                    console.log("handle1: поворот на 0 градусов (правая сторона)");
+                    break;
+                case 2: // Верхняя сторона
+                    this.handle1.setAttribute('transform', `translate(${x1}, ${y1 - offset}) rotate(-90)`);
+                    console.log("handle1: поворот на -90 градусов (верхняя сторона)");
+                    break;
+                case 3: // Нижняя сторона
+                    this.handle1.setAttribute('transform', `translate(${x1}, ${y1 + offset}) rotate(90)`);
+                    console.log("handle1: поворот на 90 градусов (нижняя сторона)");
+                    break;
+                default:
+                    this.handle1.setAttribute('transform', `translate(${x1}, ${y1})`);
+            }
+    
+            switch (side2) {
+                case 0: // Левая сторона
+                    this.handle2.setAttribute('transform', `translate(${x2 - offset}, ${y2}) rotate(180)`);
+                    console.log("handle2: поворот на 180 градусов (левая сторона)");
+                    break;
+                case 1: // Правая сторона
+                    this.handle2.setAttribute('transform', `translate(${x2 + offset}, ${y2}) rotate(0)`);
+                    console.log("handle2: поворот на 0 градусов (правая сторона)");
+                    break;
+                case 2: // Верхняя сторона
+                    this.handle2.setAttribute('transform', `translate(${x2}, ${y2 - offset}) rotate(-90)`);
+                    console.log("handle2: поворот на -90 градусов (верхняя сторона)");
+                    break;
+                case 3: // Нижняя сторона
+                    this.handle2.setAttribute('transform', `translate(${x2}, ${y2 + offset}) rotate(90)`);
+                    console.log("handle2: поворот на 90 градусов (нижняя сторона)");
+                    break;
+                default:
+                    this.handle2.setAttribute('transform', `translate(${x2}, ${y2})`);
+            }
+        } else if (this.entity1) {
+            // Если привязана только первая сущность
+            const side1 = this.entity1.getConnectionPointSide({ x: x1, y: y1 });
+            console.log(`handle1 на стороне: ${side1}, handle2 не привязана`);
+    
+            switch (side1) {
+                case 0: // Левая сторона
+                    this.handle1.setAttribute('transform', `translate(${x1 - offset}, ${y1}) rotate(180)`);
+                    console.log("handle1: поворот на 180 градусов (левая сторона)");
+                    this.handle2.setAttribute('transform', `translate(${x2}, ${y2}) rotate(0)`); // Второй наконечник
+                    break;
+                case 1: // Правая сторона
+                    this.handle1.setAttribute('transform', `translate(${x1 + offset}, ${y1}) rotate(0)`);
+                    console.log("handle1: поворот на 0 градусов (правая сторона)");
+                    this.handle2.setAttribute('transform', `translate(${x2}, ${y2}) rotate(180)`); // Второй наконечник
+                    break;
+                case 2: // Верхняя сторона
+                    this.handle1.setAttribute('transform', `translate(${x1}, ${y1 - offset}) rotate(-90)`);
+                    console.log("handle1: поворот на -90 градусов (верхняя сторона)");
+                    this.handle2.setAttribute('transform', `translate(${x2}, ${y2}) rotate(90)`); // Второй наконечник
+                    break;
+                case 3: // Нижняя сторона
+                    this.handle1.setAttribute('transform', `translate(${x1}, ${y1 + offset}) rotate(90)`);
+                    console.log("handle1: поворот на 90 градусов (нижняя сторона)");
+                    this.handle2.setAttribute('transform', `translate(${x2}, ${y2}) rotate(-90)`); // Второй наконечник
+                    break;
+                default:
+                    this.handle1.setAttribute('transform', `translate(${x1}, ${y1})`);
+                    this.handle2.setAttribute('transform', `translate(${x2}, ${y2})`);
+            }
+    
+        } else if (this.entity2) {
+            // Если привязана только вторая сущность
+            const side2 = this.entity2.getConnectionPointSide({ x: x2, y: y2 });
+            console.log(`handle2 на стороне: ${side2}, handle1 не привязана`);
+    
+            switch (side2) {
+                case 0: // Левая сторона
+                    this.handle2.setAttribute('transform', `translate(${x2 - offset}, ${y2}) rotate(180)`);
+                    console.log("handle2: поворот на 180 градусов (левая сторона)");
+                    this.handle1.setAttribute('transform', `translate(${x1}, ${y1}) rotate(0)`); // Первый наконечник
+                    break;
+                case 1: // Правая сторона
+                    this.handle2.setAttribute('transform', `translate(${x2 + offset}, ${y2}) rotate(0)`);
+                    console.log("handle2: поворот на 0 градусов (правая сторона)");
+                    this.handle1.setAttribute('transform', `translate(${x1}, ${y1}) rotate(180)`); // Первый наконечник
+                    break;
+                case 2: // Верхняя сторона
+                    this.handle2.setAttribute('transform', `translate(${x2}, ${y2 - offset}) rotate(-90)`);
+                    console.log("handle2: поворот на -90 градусов (верхняя сторона)");
+                    this.handle1.setAttribute('transform', `translate(${x1}, ${y1}) rotate(90)`); // Первый наконечник
+                    break;
+                case 3: // Нижняя сторона
+                    this.handle2.setAttribute('transform', `translate(${x2}, ${y2 + offset}) rotate(90)`);
+                    console.log("handle2: поворот на 90 градусов (нижняя сторона)");
+                    this.handle1.setAttribute('transform', `translate(${x1}, ${y1}) rotate(-90)`); // Первый наконечник
+                    break;
+                default:
+                    this.handle2.setAttribute('transform', `translate(${x2}, ${y2})`);
+                    this.handle1.setAttribute('transform', `translate(${x1}, ${y1})`);
+            }
+        } else {
+            const isVertical = Math.abs(x1 - x2) < Math.abs(y1 - y2);
+            console.log(`isVertical: ${isVertical}`);
+    
+            if (isVertical) {
+                if (y1 < y2) {
+                    this.handle1.setAttribute('transform', `translate(${x1}, ${y1 - offset}) rotate(90)`);
+                    this.handle2.setAttribute('transform', `translate(${x2}, ${y2 + offset}) rotate(-90)`);
+                    console.log("Ребро вертикальное: handle1 поворачивается на 90 градусов, handle2 на -90");
+                } else {
+                    this.handle1.setAttribute('transform', `translate(${x1}, ${y1 + offset}) rotate(-90)`);
+                    this.handle2.setAttribute('transform', `translate(${x2}, ${y2 - offset}) rotate(90)`);
+                    console.log("Ребро вертикальное: handle1 поворачивается на -90 градусов, handle2 на 90");
+                }
+            } else {
+                if (x1 < x2) {
+                    this.handle1.setAttribute('transform', `translate(${x1 - offset}, ${y1}) rotate(0)`);
+                    this.handle2.setAttribute('transform', `translate(${x2 + offset}, ${y2}) rotate(180)`);
+                    console.log("Ребро горизонтальное: handle1 без поворота, handle2 на 180 градусов");
+                } else {
+                    this.handle1.setAttribute('transform', `translate(${x1 + offset}, ${y1}) rotate(180)`);
+                    this.handle2.setAttribute('transform', `translate(${x2 - offset}, ${y2}) rotate(0)`);
+                    console.log("Ребро горизонтальное: handle1 на 180 градусов, handle2 без поворота");
+                }
+            }
+        }
     }
 
     initDragEvents() {
@@ -1215,18 +1507,15 @@ document.getElementById('createEntityButton').addEventListener('click', () => {
     const entityName = document.getElementById('entityNameInput').value || 'New Entity';
 
     let isStrong = false;
-    let isIdentificationDependent = false;
     const isRelational = document.getElementById('relationalEntityCheckbox').checked;
 
     if (selectedType === 'strong') {
         isStrong = true;
-    } else if (selectedType === 'identificationDependent') {
-        isIdentificationDependent = true;
-    }
+    } 
 
     const centerX = svgContainer.clientWidth / 2;
     const centerY = svgContainer.clientHeight / 2;
-    const newEntity = new Entity(graphHandler, entityName, centerX - 60, centerY - 30, 120, 60, isStrong, isIdentificationDependent, isRelational);
+    const newEntity = new Entity(graphHandler, entityName, centerX - 60, centerY - 30, 120, 60, isStrong, isRelational);
 
     identifiers.forEach(id => newEntity.addElement(id, true));
     attributes.forEach(attr => newEntity.addElement(attr, false));
@@ -1477,9 +1766,22 @@ function clearSelectedEntityData() {
     document.getElementById('selectedAttributesList').innerHTML = '';
 }
 
+// Добавить связь
 document.getElementById('addEdgeButton').addEventListener('click', () => {
+    const handlesOptions = document.getElementById('handlesOptions');
+    handlesOptions.style.display = handlesOptions.style.display === 'none' ? 'block' : 'none';
+    
+    document.getElementById('createEdgeButton').style.display = 'block';
+
     graphHandler.selectionModel.deselect();
     deleteEntityButton.style.display = 'none';
+});
+
+document.getElementById('createEdgeButton').addEventListener('click', () => {
+    graphHandler.selectionModel.deselect();
+    
+    const handle1Type = document.getElementById('handle1TypeSelect').value;
+    const handle2Type = document.getElementById('handle2TypeSelect').value;
 
     const svgWidth = svgContainer.clientWidth;
     const svgHeight = svgContainer.clientHeight;
@@ -1494,7 +1796,10 @@ document.getElementById('addEdgeButton').addEventListener('click', () => {
     const endX = centerX + offset;
     const endY = centerY;
 
-    graphHandler.addEdgeStandalone(startX, startY, endX, endY);
+    graphHandler.addEdgeStandalone(startX, startY, endX, endY, handle1Type, handle2Type);
+
+    document.getElementById('handlesOptions').style.display = 'none';
+    document.getElementById('createEdgeButton').style.display = 'none';
 });
 
 function updateRelationalAttribute(attr, newParams) {
