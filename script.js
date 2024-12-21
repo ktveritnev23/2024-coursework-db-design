@@ -1,12 +1,11 @@
 class Entity {
-    constructor(graph, name, x, y, width, height, isStrong, isSubtype = false, isRelational = false) {
+    constructor(graph, name, x, y, width, height, isStrong, isRelational = false) {
         this.graph = graph;
         this.geometry = { x, y, width, height };
         this.label = name || 'New Entity';
         this.isStrong = isStrong;
-        this.isSubtype = isSubtype;
         this.isRelational = isRelational;
-        this.initialFillColor = this.isSubtype ? '#9dcae7' : (this.isStrong ? '#77dd77' : '#ffc26c');
+        this.initialFillColor = this.isRelational ? '#ffffff' : (this.isStrong ? '#77dd77' : '#ffc26c');
         this.element = this.createEntityElement();
         this.attributes = [];
         this.selected = false;
@@ -133,7 +132,7 @@ class Entity {
 
         this.attributes.forEach(attr => {
             const fullText = this.isRelational
-                ? `${attr.name}: ${attr.type || ''}${['int', 'nvarchar'].includes(attr.type) && attr.length ? `(${attr.length})` : ''}${attr.isNull ? ' NULL' : ' NOT NULL'}${attr.isForeignKey ? ' (FK)' : ''}`
+                ? `${attr.name}: ${attr.type || ''}${['int', 'nvarchar'].includes(attr.type) && attr.length ? `(${attr.length})` : ''}${attr.isNull ? ' NULL' : ' NOT NULL'}${attr.isForeignKey ? ' (FK)' : ''}${' (PK)'}`
                 : attr.name;
 
             const tempText = this.createSVGElement('text', {
@@ -211,6 +210,10 @@ class Entity {
             if (text) {
                 text.setAttribute('y', newYPos + heightPerAttribute / 2);
             }
+            const keyIcon = text && text.nextElementSibling?.tagName === 'image' ? text.nextElementSibling : null;
+            if (keyIcon) {
+                keyIcon.setAttribute('y', newYPos + (heightPerAttribute - keyIcon.getAttribute('height')) / 2);
+            }
         });
 
         this.resizeHandle.setAttribute('y', totalHeight - 10);
@@ -253,6 +256,7 @@ class Entity {
         this.attributeGroup.innerHTML = '';
 
         let maxWidth = Math.max(this.geometry.width, this.calculateMinWidth()); // Учитываем минимальную ширину
+        let totalHeight = 0; 
 
         const identifiers = this.attributes.filter(attr => attr.isIdentifier);
         const attributes = this.attributes.filter(attr => !attr.isIdentifier);
@@ -260,9 +264,9 @@ class Entity {
         let yPos = 0;
 
         identifiers.forEach(attr => {
-            const cellColor = this.isSubtype ? '#6ba6cc' : (this.isStrong ? '#4fc14f' : '#e9a039');
+            const cellColor = this.isRelational ? '#B5B5B5' : (this.isStrong ? '#4fc14f' : '#e9a039');
             const fullText = this.isRelational
-                ? `${attr.name}: ${attr.type || ''}${['int', 'nvarchar'].includes(attr.type) && attr.length ? `(${attr.length})` : ''}${attr.isNull ? ' NULL' : ' NOT NULL'}${attr.isForeignKey ? ' (FK)' : ''}`
+                ? `${attr.name}: ${attr.type || ''}${['int', 'nvarchar'].includes(attr.type) && attr.length ? `(${attr.length})` : ''}${attr.isNull ? ' NULL' : ' NOT NULL'}${attr.isForeignKey ? ' (FK)' : ''}${' (PK)'}`
                 : attr.name;
 
             const attributeRect = this.createSVGElement('rect', {
@@ -300,6 +304,7 @@ class Entity {
             }
 
             yPos += cellHeight;
+            totalHeight += cellHeight;
         });
 
         attributes.forEach(attr => {
@@ -330,10 +335,11 @@ class Entity {
             this.attributeGroup.appendChild(text);
 
             yPos += cellHeight;
+            totalHeight += cellHeight;
         });
 
         this.geometry.width = maxWidth;
-        this.geometry.height = yPos;
+        this.geometry.height = totalHeight;
         this.rect.setAttribute('width', maxWidth);
         this.rect.setAttribute('height', this.geometry.height);
 
@@ -431,6 +437,7 @@ class GraphHandler {
         document.addEventListener('mouseup', () => this.onMouseUp());
         this.container.addEventListener('click', () => this.selectionModel.deselect());
     }
+
     logCells() {
         console.log(`Total entities in the graph: ${this.cells.length}`);
         // this.cells.forEach((entity, index) => {
@@ -778,76 +785,14 @@ class Edge {
         polyline.setAttribute('fill', 'none');
         return polyline;
     }
-/*
-    createSubtypeEdge(type) {
-        const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-        group.setAttribute('transform', 'translate(0, 0)');
-
-        if (type === 'inclusive') {
-            const line1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-            line1.setAttribute('x1', '10');
-            line1.setAttribute('y1', '-5');
-            line1.setAttribute('x2', '10');
-            line1.setAttribute('y2', '200');
-            line1.setAttribute('stroke', 'black');
-            line1.setAttribute('stroke-width', '1');
-
-            const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-            circle.setAttribute('cx', '10');
-            circle.setAttribute('cy', '0');
-            circle.setAttribute('r', '15');
-            circle.setAttribute('stroke', 'black');
-            circle.setAttribute('stroke-width', '1');
-            circle.setAttribute('fill', 'none');
-
-            group.appendChild(line1);
-            group.appendChild(circle);
-        } else {
-            const line1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-            line1.setAttribute('x1', '10');
-            line1.setAttribute('y1', '-5');
-            line1.setAttribute('x2', '10');
-            line1.setAttribute('y2', '200');
-            line1.setAttribute('stroke', 'black');
-            line1.setAttribute('stroke-width', '1');
-
-            const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-            circle.setAttribute('cx', '10');
-            circle.setAttribute('cy', '0');
-            circle.setAttribute('r', '15');
-            circle.setAttribute('stroke', 'black');
-            circle.setAttribute('stroke-width', '1');
-            circle.setAttribute('fill', 'none');
-
-            line2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-            line2.setAttribute('x1', '10');
-            line2.setAttribute('y1', '-5');
-            line2.setAttribute('x2', '-15');
-            line2.setAttribute('y2', '-15');
-            line2.setAttribute('stroke', 'black');
-            line2.setAttribute('stroke-width', '1');
-
-            group.appendChild(line1);
-            group.appendChild(line2);
-            group.appendChild(circle);
-        }
-    }
-*/
+    
     createHandle(type) {
         // Создаем группу элементов
         const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
         group.setAttribute('transform', 'translate(0, 0)');
 
-        // Создаем первую черточку перед кружком
         if (type === 'manyOptional') {
-            /*const line1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-            line1.setAttribute('x1', '10'); // Начало линии (настраивается позже)
-            line1.setAttribute('y1', '-5');
-            line1.setAttribute('x2', '10');
-            line1.setAttribute('y2', '5');
-            line1.setAttribute('stroke', 'black');
-            line1.setAttribute('stroke-width', '2');
-          */
+
             // Создаем кружок
             const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
             circle.setAttribute('cx', '10');
@@ -885,7 +830,6 @@ class Edge {
             line4.setAttribute('stroke-width', '1');
 
             // Добавляем элементы в группу
-            //group.appendChild(line1);
             group.appendChild(circle);
             group.appendChild(line2);
             group.appendChild(line3);
@@ -1586,19 +1530,16 @@ document.getElementById('createEntityButton').addEventListener('click', () => {
     const entityName = document.getElementById('entityNameInput').value || 'New Entity';
 
     let isStrong = false;
-    let isSubtype = false;
 
     const isRelational = document.getElementById('relationalEntityCheckbox').checked;
 
     if (selectedType === 'strong') {
         isStrong = true;
-    } else if (selectedType === 'subtype') {
-        isSubtype = true;
     }
 
     const centerX = svgContainer.clientWidth / 2;
     const centerY = svgContainer.clientHeight / 2;
-    const newEntity = new Entity(graphHandler, entityName, centerX - 60, centerY - 30, 120, 60, isStrong, isSubtype, isRelational);
+    const newEntity = new Entity(graphHandler, entityName, centerX - 60, centerY - 30, 120, 60, isStrong, isRelational);
 
     identifiers.forEach(id => newEntity.addElement(id, true));
     attributes.forEach(attr => newEntity.addElement(attr, false));
