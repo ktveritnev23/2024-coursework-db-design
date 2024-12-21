@@ -25,6 +25,7 @@
             <div class="entity-type-options">
                 <label><input type="radio" name="entityType" value="strong" checked> Strong Entity</label>
                 <label><input type="radio" name="entityType" value="weak"> Weak Entity</label>
+                <label><input type="radio" name="entityType" value="subtype"> Subtype</label>
             </div>
 
             <div>
@@ -101,9 +102,12 @@
             </select>
 
             <button id="createEdgeButton" style="display: none;">Create Edge</button>
-        </div>
 
+        </div>
+        <button id="createSubtypeButton">Create Subtype</button>
     </div>
+
+    
 
     <button id="deleteEntityButton">Delete Entity</button>
     <button id="deleteEdgeButton" style="display: none;">Delete Edge</button>

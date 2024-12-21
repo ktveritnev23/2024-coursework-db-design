@@ -1,11 +1,12 @@
 class Entity {
-    constructor(graph, name, x, y, width, height, isStrong, isRelational = false) {
+    constructor(graph, name, x, y, width, height, isStrong, isSubtype = false, isRelational = false) {
         this.graph = graph;
         this.geometry = { x, y, width, height };
         this.label = name || 'New Entity';
         this.isStrong = isStrong;
+        this.isSubtype = isSubtype;
         this.isRelational = isRelational;
-        this.initialFillColor = this.isStrong ? '#77dd77' : '#ffc26c';
+        this.initialFillColor = this.isSubtype ? '#9dcae7' : (this.isStrong ? '#77dd77' : '#ffc26c');
         this.element = this.createEntityElement();
         this.attributes = [];
         this.selected = false;
@@ -259,7 +260,7 @@ class Entity {
         let yPos = 0;
 
         identifiers.forEach(attr => {
-            const cellColor = this.isStrong ? '#4fc14f' : '#e9a039';
+            const cellColor = this.isSubtype ? '#6ba6cc' : (this.isStrong ? '#4fc14f' : '#e9a039');
             const fullText = this.isRelational
                 ? `${attr.name}: ${attr.type || ''}${['int', 'nvarchar'].includes(attr.type) && attr.length ? `(${attr.length})` : ''}${attr.isNull ? ' NULL' : ' NOT NULL'}${attr.isForeignKey ? ' (FK)' : ''}`
                 : attr.name;
@@ -416,7 +417,7 @@ class GraphHandler {
         this.cells = [];
         this.edges = [];
         this.selectedEntity = null;
-        this.selectedEdge = null; 
+        this.selectedEdge = null;
         this.selectionModel = new SelectionModel(this);
         this.isDragging = false;
         this.offsetX = 0;
@@ -586,12 +587,12 @@ class GraphHandler {
     }
 
     selectEdge(edge) {
-        this.edges.forEach(e => e.deselect()); 
-        edge.select(); 
+        this.edges.forEach(e => e.deselect());
+        edge.select();
         this.selectedEdge = edge;
 
         const deleteEdgeButton = document.getElementById('deleteEdgeButton');
-        deleteEdgeButton.style.display = 'block'; 
+        deleteEdgeButton.style.display = 'block';
     }
 
     startDragging(event, entity) {
@@ -647,7 +648,7 @@ class GraphHandler {
         this.edges = this.edges.filter(e => e !== edge);
 
         this.selectedEdge = null;
-    }    
+    }
 }
 
 class SelectionModel {
@@ -777,7 +778,61 @@ class Edge {
         polyline.setAttribute('fill', 'none');
         return polyline;
     }
+/*
+    createSubtypeEdge(type) {
+        const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        group.setAttribute('transform', 'translate(0, 0)');
 
+        if (type === 'inclusive') {
+            const line1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line1.setAttribute('x1', '10');
+            line1.setAttribute('y1', '-5');
+            line1.setAttribute('x2', '10');
+            line1.setAttribute('y2', '200');
+            line1.setAttribute('stroke', 'black');
+            line1.setAttribute('stroke-width', '1');
+
+            const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            circle.setAttribute('cx', '10');
+            circle.setAttribute('cy', '0');
+            circle.setAttribute('r', '15');
+            circle.setAttribute('stroke', 'black');
+            circle.setAttribute('stroke-width', '1');
+            circle.setAttribute('fill', 'none');
+
+            group.appendChild(line1);
+            group.appendChild(circle);
+        } else {
+            const line1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line1.setAttribute('x1', '10');
+            line1.setAttribute('y1', '-5');
+            line1.setAttribute('x2', '10');
+            line1.setAttribute('y2', '200');
+            line1.setAttribute('stroke', 'black');
+            line1.setAttribute('stroke-width', '1');
+
+            const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            circle.setAttribute('cx', '10');
+            circle.setAttribute('cy', '0');
+            circle.setAttribute('r', '15');
+            circle.setAttribute('stroke', 'black');
+            circle.setAttribute('stroke-width', '1');
+            circle.setAttribute('fill', 'none');
+
+            line2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line2.setAttribute('x1', '10');
+            line2.setAttribute('y1', '-5');
+            line2.setAttribute('x2', '-15');
+            line2.setAttribute('y2', '-15');
+            line2.setAttribute('stroke', 'black');
+            line2.setAttribute('stroke-width', '1');
+
+            group.appendChild(line1);
+            group.appendChild(line2);
+            group.appendChild(circle);
+        }
+    }
+*/
     createHandle(type) {
         // Создаем группу элементов
         const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
@@ -1034,12 +1089,6 @@ class Edge {
                     { x: start.x, y: start.y },
                     { x: start.x, y: middleY },
                     { x: end.x, y: middleY },
-                    { x: end.x, y: end.y }
-                );
-            } else if ((side1 === 1 && side2 === 2) || (side1 === 2 && side2 === 1)) {
-                points.push(
-                    { x: start.x, y: start.y },
-                    { x: end.x, y: start.y },
                     { x: end.x, y: end.y }
                 );
             }
@@ -1537,15 +1586,19 @@ document.getElementById('createEntityButton').addEventListener('click', () => {
     const entityName = document.getElementById('entityNameInput').value || 'New Entity';
 
     let isStrong = false;
+    let isSubtype = false;
+
     const isRelational = document.getElementById('relationalEntityCheckbox').checked;
 
     if (selectedType === 'strong') {
         isStrong = true;
+    } else if (selectedType === 'subtype') {
+        isSubtype = true;
     }
 
     const centerX = svgContainer.clientWidth / 2;
     const centerY = svgContainer.clientHeight / 2;
-    const newEntity = new Entity(graphHandler, entityName, centerX - 60, centerY - 30, 120, 60, isStrong, isRelational);
+    const newEntity = new Entity(graphHandler, entityName, centerX - 60, centerY - 30, 120, 60, isStrong, isSubtype, isRelational);
 
     identifiers.forEach(id => newEntity.addElement(id, true));
     attributes.forEach(attr => newEntity.addElement(attr, false));
