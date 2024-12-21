@@ -20,10 +20,10 @@ class Entity {
     }
     isPointInEntity(px, py) {
         return (
-            px >= this.geometry.x &&
-            px <= this.geometry.x + this.geometry.width &&
-            py >= this.geometry.y &&
-            py <= this.geometry.y + this.geometry.height
+            px >= this.geometry.x - 10 &&
+            px <= this.geometry.x + this.geometry.width + 10 &&
+            py >= this.geometry.y - 10 &&
+            py <= this.geometry.y + this.geometry.height + 10
         );
     }
 
@@ -350,6 +350,7 @@ class Entity {
             { x: x + width, y: y + height / 2 }
         ];
     }
+
     getConnectionPointSide(connectionPoint) {
         const { x, y } = connectionPoint;
         const { x: entityX, y: entityY, width, height } = this.geometry;
@@ -415,6 +416,7 @@ class GraphHandler {
         this.cells = [];
         this.edges = [];
         this.selectedEntity = null;
+        this.selectedEdge = null; 
         this.selectionModel = new SelectionModel(this);
         this.isDragging = false;
         this.offsetX = 0;
@@ -584,7 +586,12 @@ class GraphHandler {
     }
 
     selectEdge(edge) {
-        this.selectionModel.selectEdge(edge);
+        this.edges.forEach(e => e.deselect()); 
+        edge.select(); 
+        this.selectedEdge = edge;
+
+        const deleteEdgeButton = document.getElementById('deleteEdgeButton');
+        deleteEdgeButton.style.display = 'block'; 
     }
 
     startDragging(event, entity) {
@@ -635,6 +642,12 @@ class GraphHandler {
         this.selectionModel.deselect();
     }
 
+    deleteEdge(edge) {
+        edge.deleteEdge();
+        this.edges = this.edges.filter(e => e !== edge);
+
+        this.selectedEdge = null;
+    }    
 }
 
 class SelectionModel {
@@ -747,6 +760,16 @@ class Edge {
         }
     }
 
+    deleteEdge() {
+        this.graph.container.removeChild(this.element);
+        this.graph.container.removeChild(this.handle1);
+        this.graph.container.removeChild(this.handle2);
+
+        this.graph.edges = this.graph.edges.filter(edge => edge !== this);
+
+        document.getElementById('deleteEdgeButton').style.display = 'none';
+    }
+
     createEdgeElement() {
         const polyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
         polyline.setAttribute('stroke', 'black');
@@ -759,7 +782,7 @@ class Edge {
         // Создаем группу элементов
         const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
         group.setAttribute('transform', 'translate(0, 0)');
-      
+
         // Создаем первую черточку перед кружком
         if (type === 'manyOptional') {
             /*const line1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
@@ -778,7 +801,7 @@ class Edge {
             circle.setAttribute('stroke', 'black');
             circle.setAttribute('stroke-width', '1');
             circle.setAttribute('fill', 'none');
-          
+
             // Создаем первую диагональную черточку
             const line2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
             line2.setAttribute('x1', '0');
@@ -787,7 +810,7 @@ class Edge {
             line2.setAttribute('y2', '-10');
             line2.setAttribute('stroke', 'black');
             line2.setAttribute('stroke-width', '1');
-          
+
             // Создаем вторую диагональную черточку
             const line3 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
             line3.setAttribute('x1', '0');
@@ -796,7 +819,7 @@ class Edge {
             line3.setAttribute('y2', '10');
             line3.setAttribute('stroke', 'black');
             line3.setAttribute('stroke-width', '1');
-          
+
             // Создаем черточку, которая идет из кружка и совпадает с ребром
             const line4 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
             line4.setAttribute('x1', '10');
@@ -805,7 +828,7 @@ class Edge {
             line4.setAttribute('y2', '0');  // Это будет точка на оси X, при необходимости можно скорректировать для вертикальной оси
             line4.setAttribute('stroke', 'black');
             line4.setAttribute('stroke-width', '1');
-          
+
             // Добавляем элементы в группу
             //group.appendChild(line1);
             group.appendChild(circle);
@@ -849,7 +872,7 @@ class Edge {
             line1.setAttribute('y2', '5');
             line1.setAttribute('stroke', 'black');
             line1.setAttribute('stroke-width', '1');
-    
+
             const line2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
             line2.setAttribute('x1', '0');
             line2.setAttribute('y1', '0');
@@ -857,7 +880,7 @@ class Edge {
             line2.setAttribute('y2', '-10');
             line2.setAttribute('stroke', 'black');
             line2.setAttribute('stroke-width', '1');
-    
+
             const line3 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
             line3.setAttribute('x1', '0');
             line3.setAttribute('y1', '0');
@@ -865,7 +888,7 @@ class Edge {
             line3.setAttribute('y2', '10');
             line3.setAttribute('stroke', 'black');
             line3.setAttribute('stroke-width', '1');
-    
+
             const line4 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
             line4.setAttribute('x1', '-5');
             line4.setAttribute('y1', '0');
@@ -873,7 +896,7 @@ class Edge {
             line4.setAttribute('y2', '0');  // Это будет точка на оси X
             line4.setAttribute('stroke', 'black');
             line4.setAttribute('stroke-width', '1');
-    
+
             const line5 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
             line5.setAttribute('x1', '10');
             line5.setAttribute('y1', '0');
@@ -881,7 +904,7 @@ class Edge {
             line5.setAttribute('y2', '0');  // Это будет точка на оси X, при необходимости можно скорректировать для вертикальной оси
             line5.setAttribute('stroke', 'black');
             line5.setAttribute('stroke-width', '1');
-            
+
             group.appendChild(line1);
             group.appendChild(line2);
             group.appendChild(line3);
@@ -915,7 +938,7 @@ class Edge {
             group.appendChild(line1);
             group.appendChild(line2);
             group.appendChild(circle);
-        }      
+        }
         return group;
     }
 
@@ -1013,7 +1036,14 @@ class Edge {
                     { x: end.x, y: middleY },
                     { x: end.x, y: end.y }
                 );
-            } else {
+            } else if ((side1 === 1 && side2 === 2) || (side1 === 2 && side2 === 1)) {
+                points.push(
+                    { x: start.x, y: start.y },
+                    { x: end.x, y: start.y },
+                    { x: end.x, y: end.y }
+                );
+            }
+            else {
                 points.push(
                     { x: start.x, y: start.y },
                     { x: start.x, y: end.y },
@@ -1027,26 +1057,26 @@ class Edge {
 
     updateHandles() {
         const points = this.element.getAttribute('points').split(' ');
-    
+
         const x1 = parseFloat(points[0].split(',')[0]);
         const y1 = parseFloat(points[0].split(',')[1]);
-    
+
         const x2 = parseFloat(points[3].split(',')[0]);
         const y2 = parseFloat(points[3].split(',')[1]);
-    
-        const offset = 10; 
-    
+
+        const offset = 10;
+
         // Перемещаем группы в соответствующие позиции с учетом отступа
         this.handle1.setAttribute('transform', `translate(${x1}, ${y1})`);
         this.handle2.setAttribute('transform', `translate(${x2}, ${y2})`);
-    
+
         // Если обе сущности привязаны
         if (this.entity1 && this.entity2) {
             const side1 = this.entity1.getConnectionPointSide({ x: x1, y: y1 });
             const side2 = this.entity2.getConnectionPointSide({ x: x2, y: y2 });
-    
+
             console.log(`handle1 на стороне: ${side1}, handle2 на стороне: ${side2}`);
-    
+
             // Поворот для handle1 (в зависимости от того, на какой стороне entity1)
             switch (side1) {
                 case 0: // Левая сторона
@@ -1068,7 +1098,7 @@ class Edge {
                 default:
                     this.handle1.setAttribute('transform', `translate(${x1}, ${y1})`);
             }
-    
+
             switch (side2) {
                 case 0: // Левая сторона
                     this.handle2.setAttribute('transform', `translate(${x2 - offset}, ${y2}) rotate(180)`);
@@ -1093,7 +1123,7 @@ class Edge {
             // Если привязана только первая сущность
             const side1 = this.entity1.getConnectionPointSide({ x: x1, y: y1 });
             console.log(`handle1 на стороне: ${side1}, handle2 не привязана`);
-    
+
             switch (side1) {
                 case 0: // Левая сторона
                     this.handle1.setAttribute('transform', `translate(${x1 - offset}, ${y1}) rotate(180)`);
@@ -1119,12 +1149,12 @@ class Edge {
                     this.handle1.setAttribute('transform', `translate(${x1}, ${y1})`);
                     this.handle2.setAttribute('transform', `translate(${x2}, ${y2})`);
             }
-    
+
         } else if (this.entity2) {
             // Если привязана только вторая сущность
             const side2 = this.entity2.getConnectionPointSide({ x: x2, y: y2 });
             console.log(`handle2 на стороне: ${side2}, handle1 не привязана`);
-    
+
             switch (side2) {
                 case 0: // Левая сторона
                     this.handle2.setAttribute('transform', `translate(${x2 - offset}, ${y2}) rotate(180)`);
@@ -1153,7 +1183,7 @@ class Edge {
         } else {
             const isVertical = Math.abs(x1 - x2) < Math.abs(y1 - y2);
             console.log(`isVertical: ${isVertical}`);
-    
+
             if (isVertical) {
                 if (y1 < y2) {
                     this.handle1.setAttribute('transform', `translate(${x1}, ${y1 - offset}) rotate(90)`);
@@ -1511,7 +1541,7 @@ document.getElementById('createEntityButton').addEventListener('click', () => {
 
     if (selectedType === 'strong') {
         isStrong = true;
-    } 
+    }
 
     const centerX = svgContainer.clientWidth / 2;
     const centerY = svgContainer.clientHeight / 2;
@@ -1732,7 +1762,7 @@ document.getElementById('addNewAttributeButton').addEventListener('click', () =>
 
     if (newAttribute && selectedEntity) {
         selectedEntity.addElement(newAttribute, false);
-       
+
         selectedEntity.updateAttributesOnCanvas();
 
         displaySelectedEntityData(selectedEntity);
@@ -1770,7 +1800,7 @@ function clearSelectedEntityData() {
 document.getElementById('addEdgeButton').addEventListener('click', () => {
     const handlesOptions = document.getElementById('handlesOptions');
     handlesOptions.style.display = handlesOptions.style.display === 'none' ? 'block' : 'none';
-    
+
     document.getElementById('createEdgeButton').style.display = 'block';
 
     graphHandler.selectionModel.deselect();
@@ -1779,7 +1809,7 @@ document.getElementById('addEdgeButton').addEventListener('click', () => {
 
 document.getElementById('createEdgeButton').addEventListener('click', () => {
     graphHandler.selectionModel.deselect();
-    
+
     const handle1Type = document.getElementById('handle1TypeSelect').value;
     const handle2Type = document.getElementById('handle2TypeSelect').value;
 
@@ -1803,8 +1833,8 @@ document.getElementById('createEdgeButton').addEventListener('click', () => {
 });
 
 function updateRelationalAttribute(attr, newParams) {
-    Object.assign(attr, newParams); 
-    selectedEntity.updateAttributesOnCanvas(); 
+    Object.assign(attr, newParams);
+    selectedEntity.updateAttributesOnCanvas();
 }
 
 document.getElementById('relationalEntityCheckbox').addEventListener('change', (event) => {
@@ -1866,6 +1896,16 @@ deleteEntityButton.addEventListener('click', () => {
         deleteEntityButton.style.display = 'none';
     }
 });
+
+const deleteEdgeButton = document.getElementById('deleteEdgeButton');
+
+deleteEdgeButton.addEventListener('click', () => {
+    if (graphHandler.selectedEdge) {
+        graphHandler.deleteEdge(graphHandler.selectedEdge);
+        deleteEdgeButton.style.display = 'none';
+    }
+});
+
 
 
 //////////////// пример работы /////////////////
