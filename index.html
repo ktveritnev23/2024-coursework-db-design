@@ -1,21 +1,162 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ER Model Editor</title>
-    <style>
-        #svgContainer {
-            border: 1px solid black;
-            width: 100%;
-            height: 600px;
-        }
-    </style>
+    <link rel="stylesheet" href="style.css">
+    <script src="localize.js"></script>
+    <script src="dark_theme.js"></script>
 </head>
+
 <body>
-    <button id="addEntityButton">Add Entity</button>
-    <button id="addEdgeButton">Add Edge</button>
-    <svg id="svgContainer"></svg>
-    <script src="script.js"></script>
+<div class="color">
+        <!--<div class="page_title">
+        <h1 class="localized" data-ru="Редактор моделей баз данных" data-en="ER Model Editor"></h1>
+    </div>-->
+        <div class="side">
+        <div class="sidebar">
+            <!-- Import/Export buttons and add entity -->
+            <div class="button_box">
+                <button class="localized" id="loadGraphButton" data-ru="Импортировать граф"
+                    data-en="Import Graph"></button>
+                <button class="localized" id="saveGraphButton" data-ru="Экспортировать граф"
+                    data-en="Export Graph"></button>
+                <button class="localized" id="addEntityButton" data-ru="Добавить сущность"
+                    data-en="Add Entity"></button>
+                <input type="file" id="fileInput" style="display: none;" />
+            </div>
+
+            <div class="separator"></div>
+
+            <!-- Entity parameters -->
+            <div id="entityOptions" class="request_box" style="display: none;">
+                <div class="input_box">
+                    <input type="text" class="localized" id="entityNameInput" data-ru="Введите название сущности"
+                    data-en="Enter Entity Name..." placeholder="Введите название сущности">
+
+                </div>
+                    
+                
+
+                <div class="entity-type-options">
+                    <label class="localized" data-ru="Сильная сущность" data-en=" Strong Entity"><input type="radio"
+                            name="entityType" value="strong" checked></label>
+                    <label class="localized" data-ru="Слабая сущность" data-en=" Weak Entity"><input type="radio"
+                            name="entityType" value="weak"></label>
+                            <label class="localized" data-ru=" Реляционная сущность" data-en=" Relational Entity"><input
+                                type="checkbox" id="isRelationalCheckbox"></label>
+                </div>
+
+                
+                
+
+
+                <div class="localized" id="ident_list" data-ru="Идентификаторы" data-en="Identifiers"></div>
+
+
+                <div class="identifiers_list" id="identifiersList"></div>
+
+                <div class="input_box">
+                    <input class="localized" type="text" id="identifierInput" data-ru="Введите идентификатор..."
+                    data-en="Enter identifier..." placeholder="Введите идентификатор...">
+                </div>
+                
+
+                <div class="button_box">
+                    <button class="localized" id="addIdentifierButton" data-ru="Добавить идентификатор"
+                        data-en="Add Identifier"></button>
+                </div>
+
+                <div class="localized" id="attr_list" data-ru="Атрибуты" data-en="Attributes"></div>
+                <div id="attributesList"></div>
+
+                <div class="input_box">
+                    <input type="text" id="attributeInput" placeholder="Enter attribute">
+                </div>
+                
+
+
+
+                <div class="button_box">
+                    <button class="localized" id="addAttributeButton" data-en="Add Attribute"
+                        data-ru="Добавить атрибут"></button>
+                    <button class="localized" id="createEntityButton" data-en="Create Entity"
+                        data-ru="Создать сущность"></button>
+                </div>
+            </div>
+
+
+            <div class="separator"></div>
+
+            <div class="button_box" >
+                <button class="localized" id="addEdgeButton" data-en="Add Edge" data-ru="Добавить связь"></button>
+            </div>
+
+
+            
+
+            <div class="button_box">
+                <button class="localized" id="auto_layout" data-ru="Авторазмещение" data-en="Auto Layout"></button>
+                <button class="localized" id="toggle_dark" data-ru="Переключить тёмную тему" data-en="Toggle Dark Theme"
+                    onclick="togglecolors()"></button>
+                <button class="localized" id="change_language" data-ru="English" data-en="Русский"
+                    onclick="changelang()"></button>
+            </div>
+
+            <div id="selectedEntityData" style="display: none;">
+                <div class="input_box">
+                    <input type="text" id="selectedEntityNameInput" placeholder="Entity name">
+                </div>
+                
+    
+                <div class="input_box" id="selectedIdentifiersList"></div>
+                <div class="input_box">
+                    <input type="text" id="newIdentifierInput" placeholder="Enter new identifier">
+                </div>
+                <div class="button_box">
+                    <button id="addNewIdentifierButton" class="addButton">Add New Identifier</button>
+                </div>
+                
+    
+                <div class="input_box" id="selectedAttributesList"></div>
+                <div class="input_box">
+                    <input type="text" id="newAttributeInput" placeholder="Enter new attribute">
+                </div>
+                
+    
+                <!-- Параметры для реляционных сущностей -->
+                <div id="relationalAttributes" style="display: none;">
+                    <label><input type="checkbox" id="isNull"> NULL</label>
+                    <label><input type="checkbox" id="isForeignKey"> Foreign Key</label>
+    
+                    <h5>Attribute Type</h5>
+                    <select id="attributeTypeSelect">
+                        <option value="int">INT</option>
+                        <option value="nvarchar">NVARCHAR</option>
+                        <option value="money">MONEY</option>
+                    </select>
+                    <div id="lengthInputContainer" style="display: none;">
+                        <label for="attributeLength">Length</label>
+                        <input type="number" id="attributeLength" placeholder="Length (for int, nvarchar)">
+                    </div>
+                </div>
+                <div class="button_box">
+                    <button id="addNewAttributeButton" class="addButton">Add New Attribute</button>
+                </div>
+                
+            </div>
+
+        </div>
+    </div>
+
+        <div class="svg_canvas" id="canvas">
+            <svg id="svgContainer"></svg>
+        </div>
+
+        <script src="script.js"></script>
+    </div>
 </body>
+
 </html>

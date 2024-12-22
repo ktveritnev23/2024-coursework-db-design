@@ -1,8 +1,12 @@
 class Entity {
-    constructor(graph, name, x, y, width, height) {
+    constructor(graph, name, x, y, width, height, isStrong, isRelational) {
         this.graph = graph;
         this.geometry = { x, y, width, height };
         this.label = name || 'New Entity';
+        this.isStrong = isStrong; 
+        this.isRelational = isRelational;
+        this.initialFillColor = this.isRelational ? '#ffffff' : (this.isStrong ? '#77dd77' : '#ffc26c');
+
         this.element = this.createEntityElement();
         this.attributes = [];
         this.selected = false;
@@ -10,12 +14,11 @@ class Entity {
 
         this.element.appendChild(this.resizeHandle);
         this.initEvents();
-        this.addButton = this.createAddButton();
         this.connectionPoints = [];
         this.setConnectionPoints();
         this.hasPrimaryAttribute = false;
+        this.separator = null;
     }
-
     isPointInEntity(px, py) {
         return (
             px >= this.geometry.x &&
@@ -31,9 +34,9 @@ class Entity {
         this.rect = this.createSVGElement('rect', { 
             width: this.geometry.width, 
             height: this.geometry.height, 
-            fill: 'lightblue', 
+            fill: this.initialFillColor, 
             stroke: 'black', 
-            'stroke-width': '1' 
+            'stroke-width': '2' 
         });
     
         this.text = this.createSVGElement('text', { 
@@ -42,7 +45,9 @@ class Entity {
             'dominant-baseline': 'middle', 
             'text-anchor': 'middle', 
             fill: 'black', 
-            'font-size': '14' 
+            'font-size': '14',
+            'font-family': 'Georgia, serif', 
+            'font-weight': 'bold'
         });
         this.text.textContent = this.label;
     
@@ -72,25 +77,11 @@ class Entity {
 
     handleEntityClick(event) {
         this.graph.selectEntity(this);
+        console.log("Attributes of entity:", this.attributes);
         event.stopPropagation();
     }
 
-    createAddButton() {
-        const button = document.createElement('button');
-        button.textContent = '+';
-        button.style.position = 'absolute';
-        button.style.display = 'none';
-        button.style.cursor = 'pointer';
-        button.addEventListener('click', (event) => this.handleAddButtonClick(event));
-        document.body.appendChild(button);
-        return button;
-    }
-
-    handleAddButtonClick(event) {
-        event.stopPropagation();
-        this.showAddAttributePrompt();
-    }
-
+   
     createResizeHandle() {
         return this.createSVGElement('rect', {
             width: '10',
@@ -180,12 +171,17 @@ class Entity {
             if (text) {
                 text.setAttribute('y', newYPos + heightPerAttribute / 2); 
             }
+    
+            const keyIcon = text && text.nextElementSibling?.tagName === 'image' ? text.nextElementSibling : null;
+            if (keyIcon) {
+                keyIcon.setAttribute('y', newYPos + (heightPerAttribute - keyIcon.getAttribute('height')) / 2);
+            }
         });
     
         this.resizeHandle.setAttribute('y', totalHeight - 10);
+        this.updateSeparator();
     }
     
-
     stopResizing() {
         this.graph.isResizing = false;
         document.removeEventListener('mousemove', this.resize.bind(this));
@@ -193,101 +189,196 @@ class Entity {
     }
 
     updateTextPosition() {
-        this.text.setAttribute('x', this.geometry.width / 2);
-        this.text.setAttribute('y', -5);
+        this.text.textContent = this.label;
+        this.text.setAttribute('x', 0); 
+        this.text.setAttribute('y', -15); 
+        this.text.setAttribute('text-anchor', 'start'); 
+        this.text.setAttribute('dominant-baseline', 'hanging');
     }
+    
 
     handleAddButtonClick(event) {
         event.stopPropagation();
-        this.showAddAttributePrompt();
+    }
+ 
+    addElement(name, isIdentifier = false, isNull = false, isForeignKey = false, type = 'nvarchar', length = undefined) {
+        this.attributes.push({
+            name,
+            isIdentifier,
+            isNull,        
+            isForeignKey,
+            type,          
+            length         
+        });
+        this.updateAttributesOnCanvas();
     }
     
-    showAddAttributePrompt() {
-        const attributeName = prompt("Enter attribute name:");
-        if (attributeName) {
-            const isIdentifier = confirm("Is this an identifier?");
-            this.addElement(attributeName, isIdentifier);
+    updateSeparator() {
+        if (this.separator) {
+            this.element.removeChild(this.separator);
+        }
+
+        if (this.identifierGroup.children.length > 0 && this.attributeGroup.children.length > 0) {
+            console.log('Number of identifiers:', this.identifierGroup.children.length);
+            console.log('Number of attributes:', this.attributeGroup.children.length);
+            const lastIdentifier = Array.from(this.identifierGroup.children).reverse().find(child => child.tagName === 'rect' && child.classList.contains('table-cell'));
+        const firstAttribute = Array.from(this.attributeGroup.children).find(child => child.tagName === 'rect' && child.classList.contains('table-cell'));
+            console.log('Last Identifier outerHTML:', lastIdentifier.outerHTML);
+            console.log('First Attribute outerHTML:', firstAttribute.outerHTML);
+            
+            const separatorY = parseFloat(lastIdentifier.getAttribute('y')) + parseFloat(lastIdentifier.getAttribute('height'));
+
+            this.separator = this.createSVGElement('line', {
+                x1: 0,
+                y1: separatorY,
+                x2: this.geometry.width,
+                y2: separatorY,
+                stroke: 'black',
+                'stroke-width': '1'
+            });
+
+            this.element.appendChild(this.separator);
         }
     }
 
-    addElement(name, isIdentifier = false) {
-        this.attributes.push({ name, isIdentifier });
+    updateAttributesOnCanvas() {
+        this.identifierGroup.innerHTML = '';
+        this.attributeGroup.innerHTML = '';
     
-        const attributeCount = this.attributes.length;
-        const heightPerAttribute = this.geometry.height / attributeCount;
-        
-        const yPos = heightPerAttribute * (attributeCount - 1);
+        const heightPerAttribute = this.geometry.height / (this.attributes.length || 1);
+        const isStrong = this.isStrong;
     
-        const attributeRect = this.createSVGElement('rect', {
-            class: 'table-cell',
-            width: this.geometry.width,
-            height: heightPerAttribute, 
-            y: yPos,
-            fill: 'lightgreen',
-            stroke: 'black',
-            'stroke-width': '1'
+        this.attributes.forEach((attr, index) => {
+            const yPos = heightPerAttribute * index;
+    
+            let fillColor = this.initialFillColor; 
+    
+            if (attr.isIdentifier) {
+                if (this.isRelational) {
+                    fillColor = '#B5B5B5'; 
+                } else if (isStrong) {
+                    fillColor = '#228B22'; 
+                } else {
+                    fillColor = '#E9A039'; 
+                }
+            }
+    
+            const attributeRect = this.createSVGElement('rect', {
+                class: 'table-cell',
+                width: this.geometry.width,
+                height: heightPerAttribute,
+                y: yPos,
+                fill: fillColor,
+                stroke: 'none',
+            });
+    
+            let attributeText;
+            if (this.isRelational) {
+                attributeText = `${attr.name}: ${attr.type}`;
+                if (['int', 'nvarchar'].includes(attr.type) && attr.length) {
+                    attributeText += `(${attr.length})`;
+                }
+                attributeText += attr.isNull ? ' NULL' : ' NOT NULL';
+                if (attr.isForeignKey) {
+                    attributeText += ' (FK)';
+                }
+                if (attr.isIdentifier) {
+                    attributeText += ' (PK)';
+                }
+            } else {
+                attributeText = attr.name;
+            }
+    
+            const textAttributes = attr.isIdentifier
+                ? { 'font-size': '18', 'font-weight': 'bold' } 
+                : { 'font-size': '16', 'font-weight': 'normal' }; 
+    
+            const text = this.createSVGElement('text', {
+                x: attr.isIdentifier ? '50' : '5', 
+                y: yPos + heightPerAttribute / 2,
+                fill: 'black',
+                'font-family': 'Georgia, serif', 
+                'text-anchor': 'start',
+                'alignment-baseline': 'middle', 
+                ...textAttributes, 
+            });
+            text.textContent = attributeText;
+    
+            if (attr.isIdentifier) {
+                this.identifierGroup.appendChild(attributeRect);
+                this.identifierGroup.appendChild(text);
+                if (this.isRelational) {
+                    const keyIcon = this.createSVGElement('image', {
+                        href: './resrcs/key.png',
+                        x: 5, 
+                        y: yPos + (heightPerAttribute - 12 * 2) / 2, 
+                        width: 12 * 3,
+                        height: 12 * 3,
+                    });
+                    this.identifierGroup.appendChild(keyIcon); 
+                }
+            } else {
+                this.attributeGroup.appendChild(attributeRect);
+                this.attributeGroup.appendChild(text);
+            }
         });
-        
-        const text = this.createSVGElement('text', {
-            x: '5',
-            y: yPos + heightPerAttribute / 2, 
-            fill: 'black',
-            'font-size': '12',
-            'text-anchor': 'start'
-        });
-        text.textContent = name;
     
-        if (isIdentifier) {
-            this.identifierGroup.appendChild(attributeRect);
-            this.identifierGroup.appendChild(text);
-        } else {
-            this.attributeGroup.appendChild(attributeRect);
-            this.attributeGroup.appendChild(text);
-        }
-    
-        this.geometry.height = heightPerAttribute * attributeCount;  
+        this.geometry.height = heightPerAttribute * this.attributes.length;
         this.rect.setAttribute('height', this.geometry.height);
         this.updateResizeHandlePosition();
-        this.element.appendChild(this.resizeHandle);
-    
         this.updateAttributePositions();
+        this.updateSeparator();
     }
     
-    showButton() {
-        const { x, y } = this.geometry;
-        this.addButton.style.left = `${x + this.geometry.width}px`;
-        this.addButton.style.top = `${y}px`;
-        this.addButton.style.display = 'block';
-    }
-
-    hideButton() {
-        this.addButton.style.display = 'none';
-    }
-
     setConnectionPoints() {
         const { x, y, width, height } = this.geometry;
         this.connectionPoints = [
-            { x: x + width / 5, y: y },
+            { x: x + width / 2, y: y },
             { x: x + width / 2, y: y + height },
             { x: x, y: y + height / 2 },
             { x: x + width, y: y + height / 2 }
         ];
     }
-
-    findClosestConnectionPoint(targetEntity) {
-        this.setConnectionPoints();
-
-        const targetCenterX = targetEntity.geometry.x + targetEntity.geometry.width / 2;
-        const targetCenterY = targetEntity.geometry.y + targetEntity.geometry.height / 2;
-
-        return this.connectionPoints.reduce((closestPoint, point) => {
-            const distance = this.calculateDistance(point, { x: targetCenterX, y: targetCenterY });
-            if (distance < closestPoint.distance) {
-                return { point, distance };
-            }
-            return closestPoint;
-        }, { point: null, distance: Infinity }).point;
+    getConnectionPointSide(connectionPoint) {
+        const { x, y } = connectionPoint;
+        const { x: entityX, y: entityY, width, height } = this.geometry;
+        const tolerance = 1;
+    
+        if (Math.abs(x - entityX) <= tolerance) {
+            return 0; 
+        } else if (Math.abs(x - (entityX + width)) <= tolerance) {
+            return 1; 
+        } else if (Math.abs(y - entityY) <= tolerance) {
+            return 2; 
+        } else if (Math.abs(y - (entityY + height)) <= tolerance) {
+            return 3; 
+        }
+    
+        console.warn("Connection point is out of bounds:", connectionPoint);
+        return -1;
     }
+    
+    findClosestConnectionPoints(targetEntity) {
+        this.setConnectionPoints();
+        targetEntity.setConnectionPoints();
+        console.log("targetEntity connectionPoints in findMethod", targetEntity.connectionPoints);
+        let minDistance = Infinity;
+        let closestPoints = { start: null, end: null };
+    
+        for (const point1 of this.connectionPoints) {
+            for (const point2 of targetEntity.connectionPoints) {
+                const distance = this.calculateDistance(point1, point2);
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    closestPoints.start = point1;
+                    closestPoints.end = point2;
+                }
+            }
+        }
+    
+        return closestPoints; 
+    }
+    
 
     calculateDistance(point1, point2) {
         const dx = point1.x - point2.x;
@@ -307,10 +398,9 @@ class Entity {
     }
 }
 
-
-
 class GraphHandler {
-    constructor(container) {
+    constructor(wrapper, container) {
+        this.wrapper = wrapper;
         this.container = container;
         this.cells = [];
         this.edges = [];
@@ -328,7 +418,125 @@ class GraphHandler {
         document.addEventListener('mouseup', () => this.onMouseUp());
         this.container.addEventListener('click', () => this.selectionModel.deselect());
     }
+    logCells() {
+        console.log(`Total entities in the graph: ${this.cells.length}`);
+        // this.cells.forEach((entity, index) => {
+        //     console.log(`Entity ${index + 1}:`);
+        //     console.log(`Name: ${entity.label}`);
+        //     console.log(`Position: (${entity.geometry.x}, ${entity.geometry.y})`);
+        //     console.log(`Size: ${entity.geometry.width}x${entity.geometry.height}`);
+        //     console.log(`Is Strong: ${entity.isStrong}`);
+        //     console.log(`Attributes: ${entity.attributes.map(attr => attr.name).join(', ')}`);
+        //     console.log(`Identifiers: ${entity.attributes.filter(attr => attr.isIdentifier).map(attr => attr.name).join(', ')}`);
+        // });
+    }
+    saveGraphState() {
+    const graphState = {
+        entities: this.cells.map(entity => this.serializeEntity(entity)),
+        edges: this.edges.map(edge => this.serializeEdge(edge))
+    };
 
+    const jsonString = JSON.stringify(graphState, null, 2);
+    
+    const blob = new Blob([jsonString], { type: 'application/json' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'graphState.json';
+    link.click();
+}
+
+serializeEntity(entity) {
+    return {
+        name: entity.label,
+        x: entity.geometry.x,
+        y: entity.geometry.y,
+        width: entity.geometry.width,
+        height: entity.geometry.height,
+        isStrong: entity.isStrong,
+        attributes: entity.attributes.filter(attr => !attr.isIdentifier).map(attr => attr.name), 
+        identifiers: entity.attributes.filter(attr => attr.isIdentifier).map(attr => attr.name) 
+    };
+}
+
+serializeEdge(edge) {
+    const pointsString = edge.element.getAttribute('points');
+    const pointsArray = pointsString.split(' ').map(point => {
+        const [x, y] = point.split(',');
+        return { x: parseFloat(x), y: parseFloat(y) };
+    });
+
+    return {
+        isStandalone: edge.isStandalone,
+        entity1: edge.entity1 ? edge.entity1.label : null,
+        entity2: edge.entity2 ? edge.entity2.label : null,
+        points: pointsArray 
+    };
+}
+
+
+loadState(file) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            const graphState = JSON.parse(e.target.result);
+            this.cells = [];
+            this.edges = [];
+
+            graphState.entities.forEach(entityData => {
+                const entity = new Entity(
+                    this, 
+                    entityData.name, 
+                    entityData.x, 
+                    entityData.y, 
+                    entityData.width, 
+                    entityData.height, 
+                    entityData.isStrong
+                );
+
+                if (entityData.identifiers.length > 0) {
+                    entityData.identifiers.forEach(identifier => {
+                        entity.addElement(identifier, true);
+                    });
+                }
+
+                if (entityData.attributes.length > 0) {
+                    entityData.attributes.forEach(attribute => {
+                        entity.addElement(attribute, false);
+                    });
+                }
+
+                this.cells.push(entity);
+                this.container.appendChild(entity.element);
+            });
+
+            graphState.edges.forEach(edgeData => {
+                let entity1 = null, entity2 = null;
+
+                if (edgeData.entity1) {
+                    entity1 = this.cells.find(e => e.label === edgeData.entity1);
+                }
+                if (edgeData.entity2) {
+                    entity2 = this.cells.find(e => e.label === edgeData.entity2);
+                }
+
+                const edge = new Edge(this, entity1, entity2, edgeData.isStandalone);
+
+                edge.element.setAttribute('points', edgeData.points.map(p => `${p.x},${p.y}`).join(' '));
+                edge.updateHandles();
+
+                this.container.appendChild(edge.element);
+                this.container.appendChild(edge.handle1);
+                this.container.appendChild(edge.handle2);
+
+                this.edges.push(edge);
+            });
+            this.logCells();
+        } catch (err) {
+            console.error('error:', err);
+        }
+    };
+    reader.readAsText(file);
+}
     onMouseMove(event) {
         if (this.isDragging) {
             this.moveEntity(event);
@@ -342,6 +550,7 @@ class GraphHandler {
 
     addEntity(entity) {
         this.cells.push(entity);
+        this.logCells()
     }
 
     addEdge(entity1, entity2) {
@@ -351,7 +560,7 @@ class GraphHandler {
     }
 
     addEdgeStandalone(x1, y1, x2, y2) {
-        const edge = new Edge(this, null, null, true);
+        const edge = new Edge(this, null, null, true,'oneManyOptional', 'oneManyOptional');
         edge.setStandalonePosition(x1, y1, x2, y2);
         this.edges.push(edge);
     }
@@ -376,9 +585,10 @@ class GraphHandler {
     }
 
     setDraggingOffsets(event) {
+        const parent_rect = this.wrapper.getBoundingClientRect();
         const rect = this.selectedEntity.element.getBoundingClientRect();
-        this.offsetX = event.clientX - rect.left;
-        this.offsetY = event.clientY - rect.top;
+        this.offsetX = event.clientX - rect.left +parent_rect.left;
+        this.offsetY = event.clientY - rect.top + parent_rect.top;
     }
 
     moveEntity(event) {
@@ -399,7 +609,6 @@ class GraphHandler {
         this.selectedEntity.geometry.x = newX;
         this.selectedEntity.geometry.y = newY;
         this.selectedEntity.element.setAttribute('transform', `translate(${newX}, ${newY})`);
-        this.selectedEntity.showButton();
     }
 }
 
@@ -414,13 +623,17 @@ class SelectionModel {
         this.selectedElement = entity;
         this.highlightSelection(entity);
         this.showResizeHandle(entity);
+        displaySelectedEntityData(entity);
     }
 
     selectEdge(edge) {
         this.clearPreviousSelection();
         this.selectedElement = edge;
         this.highlightSelection(edge);
+    
+        displaySelectedEdgeData(edge);
     }
+    
 
     clearPreviousSelection() {
         if (this.selectedElement) {
@@ -434,11 +647,11 @@ class SelectionModel {
         } else if (element instanceof Edge) {
             element.deselect();
         }
+        clearSelectedEntityData();
     }
 
     clearEntitySelection(entity) {
-        entity.rect.setAttribute('fill', 'lightblue');
-        entity.hideButton();
+        entity.rect.setAttribute('stroke', 'black'); 
         this.hideResizeHandle(entity);
     }
 
@@ -459,8 +672,7 @@ class SelectionModel {
     }
 
     highlightEntitySelection(entity) {
-        entity.rect.setAttribute('fill', 'yellow');
-        entity.showButton();
+        entity.rect.setAttribute('stroke', 'red'); 
     }
 
     deselect() {
@@ -471,9 +683,8 @@ class SelectionModel {
     }
 }
 
-
 class Edge {
-    constructor(graph, entity1 = null, entity2 = null, isStandalone = false) {
+    constructor(graph, entity1 = null, entity2 = null, isStandalone = false, handle1Type = 'oneOneOptional', handle2Type = 'oneManyMandatory') {
         this.graph = graph;
         this.entity1 = entity1;
         this.entity2 = entity2;
@@ -484,8 +695,8 @@ class Edge {
         this.dragStart = { x: 0, y: 0 };
 
         this.element = this.createEdgeElement();
-        this.handle1 = this.createHandle();
-        this.handle2 = this.createHandle();
+        this.handle1 = this.createHandle(handle1Type);
+        this.handle2 = this.createHandle(handle2Type);
 
         this.graph.container.appendChild(this.element);
         this.graph.container.appendChild(this.handle1);
@@ -500,40 +711,406 @@ class Edge {
     }
 
     createEdgeElement() {
-        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-        line.setAttribute('stroke', 'black');
-        line.setAttribute('stroke-width', '1');
-        return line;
+        const polyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+        polyline.setAttribute('stroke', 'black');
+        polyline.setAttribute('stroke-width', '1');
+        polyline.setAttribute('fill', 'none');
+        return polyline;
     }
 
-    createHandle() {
-        const handle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-        handle.setAttribute('r', 5);
-        handle.setAttribute('fill', 'red');
-        handle.setAttribute('stroke', 'black');
-        handle.setAttribute('stroke-width', '1');
-        return handle;
+    createHandle(type) {
+        // Создаем группу элементов
+        const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        group.setAttribute('transform', 'translate(0, 0)');
+      
+        // Создаем первую черточку перед кружком
+        if (type === 'oneManyOptional') {
+            const line1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line1.setAttribute('x1', '10'); // Начало линии (настраивается позже)
+            line1.setAttribute('y1', '-5');
+            line1.setAttribute('x2', '10');
+            line1.setAttribute('y2', '5');
+            line1.setAttribute('stroke', 'black');
+            line1.setAttribute('stroke-width', '2');
+          
+            // Создаем кружок
+            const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            circle.setAttribute('cx', '0');
+            circle.setAttribute('cy', '0');
+            circle.setAttribute('r', '5');
+            circle.setAttribute('stroke', 'black');
+            circle.setAttribute('stroke-width', '2');
+            circle.setAttribute('fill', 'none');
+          
+            // Создаем первую диагональную черточку
+            const line2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line2.setAttribute('x1', '0');
+            line2.setAttribute('y1', '0');
+            line2.setAttribute('x2', '-10'); // Угол π/4 (настраивается позже)
+            line2.setAttribute('y2', '-10');
+            line2.setAttribute('stroke', 'black');
+            line2.setAttribute('stroke-width', '2');
+          
+            // Создаем вторую диагональную черточку
+            const line3 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line3.setAttribute('x1', '0');
+            line3.setAttribute('y1', '0');
+            line3.setAttribute('x2', '-10'); // Угол 5π/4 (настраивается позже)
+            line3.setAttribute('y2', '10');
+            line3.setAttribute('stroke', 'black');
+            line3.setAttribute('stroke-width', '2');
+          
+            // Создаем черточку, которая идет из кружка и совпадает с ребром
+            const line4 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line4.setAttribute('x1', '-5');
+            line4.setAttribute('y1', '0');
+            line4.setAttribute('x2', '-12'); // Это будет точка, куда ребро должно направляться, например вправо
+            line4.setAttribute('y2', '0');  // Это будет точка на оси X, при необходимости можно скорректировать для вертикальной оси
+            line4.setAttribute('stroke', 'black');
+            line4.setAttribute('stroke-width', '2');
+          
+            // Добавляем элементы в группу
+            group.appendChild(line1);
+            group.appendChild(circle);
+            group.appendChild(line2);
+            group.appendChild(line3);
+            group.appendChild(line4);  // Добавляем новую черточку
+        } else if (type === 'oneOneMandatory') {
+            const line1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line1.setAttribute('x1', '8'); // Начало линии (настраивается позже)
+            line1.setAttribute('y1', '-5');
+            line1.setAttribute('x2', '8');
+            line1.setAttribute('y2', '5');
+            line1.setAttribute('stroke', 'black');
+            line1.setAttribute('stroke-width', '2');
+
+            const line2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line2.setAttribute('x1', '14'); // Начало линии (настраивается позже)
+            line2.setAttribute('y1', '-5');
+            line2.setAttribute('x2', '14');
+            line2.setAttribute('y2', '5');
+            line2.setAttribute('stroke', 'black');
+            line2.setAttribute('stroke-width', '2');
+
+            group.appendChild(line1);
+            group.appendChild(line2);
+        } else if (type === 'oneManyMandatory') {
+            const line1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line1.setAttribute('x1', '10'); // Начало линии (настраивается позже)
+            line1.setAttribute('y1', '-5');
+            line1.setAttribute('x2', '10');
+            line1.setAttribute('y2', '5');
+            line1.setAttribute('stroke', 'black');
+            line1.setAttribute('stroke-width', '2');
+    
+            const line2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line2.setAttribute('x1', '0');
+            line2.setAttribute('y1', '0');
+            line2.setAttribute('x2', '-10'); // Угол π/4 (настраивается позже)
+            line2.setAttribute('y2', '-10');
+            line2.setAttribute('stroke', 'black');
+            line2.setAttribute('stroke-width', '2');
+    
+            const line3 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line3.setAttribute('x1', '0');
+            line3.setAttribute('y1', '0');
+            line3.setAttribute('x2', '-10'); // Угол 5π/4 (настраивается позже)
+            line3.setAttribute('y2', '10');
+            line3.setAttribute('stroke', 'black');
+            line3.setAttribute('stroke-width', '2');
+    
+            const line4 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line4.setAttribute('x1', '-5');
+            line4.setAttribute('y1', '0');
+            line4.setAttribute('x2', '-12'); // Это будет точка, куда ребро должно направляться
+            line4.setAttribute('y2', '0');  // Это будет точка на оси X
+            line4.setAttribute('stroke', 'black');
+            line4.setAttribute('stroke-width', '2');
+    
+            group.appendChild(line1);
+            group.appendChild(line2);
+            group.appendChild(line3);
+            group.appendChild(line4);
+        } else if (type === 'oneOneOptional') {
+            const line1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line1.setAttribute('x1', '10'); // Начало линии (настраивается позже)
+            line1.setAttribute('y1', '-5');
+            line1.setAttribute('x2', '10');
+            line1.setAttribute('y2', '5');
+            line1.setAttribute('stroke', 'black');
+            line1.setAttribute('stroke-width', '2');
+
+            const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            circle.setAttribute('cx', '0');
+            circle.setAttribute('cy', '0');
+            circle.setAttribute('r', '5');
+            circle.setAttribute('stroke', 'black');
+            circle.setAttribute('stroke-width', '2');
+            circle.setAttribute('fill', 'none');
+
+            group.appendChild(line1);
+            group.appendChild(circle);
+        }      
+        return group;
     }
 
     setStandalonePosition(x1, y1, x2, y2) {
-        this.element.setAttribute('x1', x1);
-        this.element.setAttribute('y1', y1);
-        this.element.setAttribute('x2', x2);
-        this.element.setAttribute('y2', y2);
+        const points = this.createPolylinePath({ x: x1, y: y1 }, { x: x2, y: y2 });
+        this.element.setAttribute('points', points);
         this.updateHandles();
         this.updateAppearance();
     }
 
-    updateHandles() {
-        const x1 = parseFloat(this.element.getAttribute('x1'));
-        const y1 = parseFloat(this.element.getAttribute('y1'));
-        const x2 = parseFloat(this.element.getAttribute('x2'));
-        const y2 = parseFloat(this.element.getAttribute('y2'));
+    createPolylinePath(start, end) {
+        const points = [];
+    
+        if (!this.entity1 && !this.entity2) {
+            const deltaX = Math.abs(start.x - end.x);
+            const deltaY = Math.abs(start.y - end.y);
+    
+            if (deltaX > deltaY) {
+                const middleX = (start.x + end.x) / 2;
+                points.push(
+                    { x: start.x, y: start.y },
+                    { x: middleX, y: start.y },
+                    { x: middleX, y: end.y },
+                    { x: end.x, y: end.y }
+                );
+            } else {
+                const middleY = (start.y + end.y) / 2;
+                points.push(
+                    { x: start.x, y: start.y },
+                    { x: start.x, y: middleY },
+                    { x: end.x, y: middleY },
+                    { x: end.x, y: end.y }
+                );
+            }
+        } else if (this.entity1 && !this.entity2) {
+            const side = this.entity1.getConnectionPointSide(start)
+            const middleX = (start.x + end.x) / 2;
+            const middleY = (start.y + end.y) / 2;
+            if (side == 0 || side == 1) {
+                points.push(
+                    { x: start.x, y: start.y },
+                    { x: middleX, y: start.y },
+                    { x: middleX, y: end.y },
+                    { x: end.x, y: end.y }
+                );
+            } else {
+                points.push(
+                    { x: start.x, y: start.y },
+                    { x: start.x, y: middleY },
+                    { x: end.x, y: middleY },
+                    { x: end.x, y: end.y }
+                );
+            }
+        } else if (!this.entity1 && this.entity2) {
+            console.log("entity2 существует")
+            const side = this.entity2.getConnectionPointSide(end)
+            console.log("end",end)
+            console.log(side)
+    
+            const middleX = (start.x + end.x) / 2;
+            const middleY = (start.y + end.y) / 2;
+           
+            if (side == 0 || side == 1) {
+                points.push(
+                    { x: start.x, y: start.y },
+                    { x: middleX, y: start.y },
+                    { x: middleX, y: end.y },
+                    { x: end.x, y: end.y }
+                );
+            } else {
+                points.push(
+                    { x: start.x, y: start.y },
+                    { x: start.x, y: middleY },
+                    { x: end.x, y: middleY },
+                    { x: end.x, y: end.y }
+                );
+            }
 
-        this.handle1.setAttribute('cx', x1);
-        this.handle1.setAttribute('cy', y1);
-        this.handle2.setAttribute('cx', x2);
-        this.handle2.setAttribute('cy', y2);
+        } else {
+            const side1 = this.entity1.getConnectionPointSide(start);
+            const side2 = this.entity2.getConnectionPointSide(end);
+            const middleX = (start.x + end.x) / 2;
+            const middleY = (start.y + end.y) / 2;
+            if ((side1 === 0 || side1 === 1) && (side2 === 0 || side2 === 1)) {
+                points.push(
+                    { x: start.x, y: start.y },
+                    { x: middleX, y: start.y },
+                    { x: middleX, y: end.y },
+                    { x: end.x, y: end.y }
+                );
+            } else if ((side1 === 2 || side1 === 3) && (side2 === 2 || side2 === 3)) {
+                points.push(
+                    { x: start.x, y: start.y },
+                    { x: start.x, y: middleY },
+                    { x: end.x, y: middleY },
+                    { x: end.x, y: end.y }
+                );
+            } else {
+                points.push(
+                    { x: start.x, y: start.y },
+                    { x: start.x, y: end.y },
+                    { x: end.x, y: end.y },
+                    { x: end.x, y: end.y }
+                );
+            }
+        }
+        return points.map(p => `${p.x},${p.y}`).join(' ');
+    }
+    
+    updateHandles() {
+        const points = this.element.getAttribute('points').split(' ');
+    
+        const x1 = parseFloat(points[0].split(',')[0]);
+        const y1 = parseFloat(points[0].split(',')[1]);
+    
+        const x2 = parseFloat(points[3].split(',')[0]);
+        const y2 = parseFloat(points[3].split(',')[1]);
+    
+        const offset = 10; 
+    
+        // Перемещаем группы в соответствующие позиции с учетом отступа
+        this.handle1.setAttribute('transform', `translate(${x1}, ${y1})`);
+        this.handle2.setAttribute('transform', `translate(${x2}, ${y2})`);
+    
+        // Если обе сущности привязаны
+        if (this.entity1 && this.entity2) {
+            const side1 = this.entity1.getConnectionPointSide({ x: x1, y: y1 });
+            const side2 = this.entity2.getConnectionPointSide({ x: x2, y: y2 });
+    
+            console.log(`handle1 на стороне: ${side1}, handle2 на стороне: ${side2}`);
+    
+            // Поворот для handle1 (в зависимости от того, на какой стороне entity1)
+            switch (side1) {
+                case 0: // Левая сторона
+                    this.handle1.setAttribute('transform', `translate(${x1 - offset}, ${y1}) rotate(180)`);
+                    console.log("handle1: поворот на 180 градусов (левая сторона)");
+                    break;
+                case 1: // Правая сторона
+                    this.handle1.setAttribute('transform', `translate(${x1 + offset}, ${y1}) rotate(0)`);
+                    console.log("handle1: поворот на 0 градусов (правая сторона)");
+                    break;
+                case 2: // Верхняя сторона
+                    this.handle1.setAttribute('transform', `translate(${x1}, ${y1 - offset}) rotate(-90)`);
+                    console.log("handle1: поворот на -90 градусов (верхняя сторона)");
+                    break;
+                case 3: // Нижняя сторона
+                    this.handle1.setAttribute('transform', `translate(${x1}, ${y1 + offset}) rotate(90)`);
+                    console.log("handle1: поворот на 90 градусов (нижняя сторона)");
+                    break;
+                default:
+                    this.handle1.setAttribute('transform', `translate(${x1}, ${y1})`);
+            }
+    
+            switch (side2) {
+                case 0: // Левая сторона
+                    this.handle2.setAttribute('transform', `translate(${x2 - offset}, ${y2}) rotate(180)`);
+                    console.log("handle2: поворот на 180 градусов (левая сторона)");
+                    break;
+                case 1: // Правая сторона
+                    this.handle2.setAttribute('transform', `translate(${x2 + offset}, ${y2}) rotate(0)`);
+                    console.log("handle2: поворот на 0 градусов (правая сторона)");
+                    break;
+                case 2: // Верхняя сторона
+                    this.handle2.setAttribute('transform', `translate(${x2}, ${y2 - offset}) rotate(-90)`);
+                    console.log("handle2: поворот на -90 градусов (верхняя сторона)");
+                    break;
+                case 3: // Нижняя сторона
+                    this.handle2.setAttribute('transform', `translate(${x2}, ${y2 + offset}) rotate(90)`);
+                    console.log("handle2: поворот на 90 градусов (нижняя сторона)");
+                    break;
+                default:
+                    this.handle2.setAttribute('transform', `translate(${x2}, ${y2})`);
+            }
+        } else if (this.entity1) {
+            // Если привязана только первая сущность
+            const side1 = this.entity1.getConnectionPointSide({ x: x1, y: y1 });
+            console.log(`handle1 на стороне: ${side1}, handle2 не привязана`);
+    
+            switch (side1) {
+                case 0: // Левая сторона
+                    this.handle1.setAttribute('transform', `translate(${x1 - offset}, ${y1}) rotate(180)`);
+                    console.log("handle1: поворот на 180 градусов (левая сторона)");
+                    this.handle2.setAttribute('transform', `translate(${x2}, ${y2}) rotate(0)`); // Второй наконечник
+                    break;
+                case 1: // Правая сторона
+                    this.handle1.setAttribute('transform', `translate(${x1 + offset}, ${y1}) rotate(0)`);
+                    console.log("handle1: поворот на 0 градусов (правая сторона)");
+                    this.handle2.setAttribute('transform', `translate(${x2}, ${y2}) rotate(180)`); // Второй наконечник
+                    break;
+                case 2: // Верхняя сторона
+                    this.handle1.setAttribute('transform', `translate(${x1}, ${y1 - offset}) rotate(-90)`);
+                    console.log("handle1: поворот на -90 градусов (верхняя сторона)");
+                    this.handle2.setAttribute('transform', `translate(${x2}, ${y2}) rotate(90)`); // Второй наконечник
+                    break;
+                case 3: // Нижняя сторона
+                    this.handle1.setAttribute('transform', `translate(${x1}, ${y1 + offset}) rotate(90)`);
+                    console.log("handle1: поворот на 90 градусов (нижняя сторона)");
+                    this.handle2.setAttribute('transform', `translate(${x2}, ${y2}) rotate(-90)`); // Второй наконечник
+                    break;
+                default:
+                    this.handle1.setAttribute('transform', `translate(${x1}, ${y1})`);
+                    this.handle2.setAttribute('transform', `translate(${x2}, ${y2})`);
+            }
+    
+        } else if (this.entity2) {
+            // Если привязана только вторая сущность
+            const side2 = this.entity2.getConnectionPointSide({ x: x2, y: y2 });
+            console.log(`handle2 на стороне: ${side2}, handle1 не привязана`);
+    
+            switch (side2) {
+                case 0: // Левая сторона
+                    this.handle2.setAttribute('transform', `translate(${x2 - offset}, ${y2}) rotate(180)`);
+                    console.log("handle2: поворот на 180 градусов (левая сторона)");
+                    this.handle1.setAttribute('transform', `translate(${x1}, ${y1}) rotate(0)`); // Первый наконечник
+                    break;
+                case 1: // Правая сторона
+                    this.handle2.setAttribute('transform', `translate(${x2 + offset}, ${y2}) rotate(0)`);
+                    console.log("handle2: поворот на 0 градусов (правая сторона)");
+                    this.handle1.setAttribute('transform', `translate(${x1}, ${y1}) rotate(180)`); // Первый наконечник
+                    break;
+                case 2: // Верхняя сторона
+                    this.handle2.setAttribute('transform', `translate(${x2}, ${y2 - offset}) rotate(-90)`);
+                    console.log("handle2: поворот на -90 градусов (верхняя сторона)");
+                    this.handle1.setAttribute('transform', `translate(${x1}, ${y1}) rotate(90)`); // Первый наконечник
+                    break;
+                case 3: // Нижняя сторона
+                    this.handle2.setAttribute('transform', `translate(${x2}, ${y2 + offset}) rotate(90)`);
+                    console.log("handle2: поворот на 90 градусов (нижняя сторона)");
+                    this.handle1.setAttribute('transform', `translate(${x1}, ${y1}) rotate(-90)`); // Первый наконечник
+                    break;
+                default:
+                    this.handle2.setAttribute('transform', `translate(${x2}, ${y2})`);
+                    this.handle1.setAttribute('transform', `translate(${x1}, ${y1})`);
+            }
+        } else {
+            const isVertical = Math.abs(x1 - x2) < Math.abs(y1 - y2);
+            console.log(`isVertical: ${isVertical}`);
+    
+            if (isVertical) {
+                if (y1 < y2) {
+                    this.handle1.setAttribute('transform', `translate(${x1}, ${y1 - offset}) rotate(90)`);
+                    this.handle2.setAttribute('transform', `translate(${x2}, ${y2 + offset}) rotate(-90)`);
+                    console.log("Ребро вертикальное: handle1 поворачивается на 90 градусов, handle2 на -90");
+                } else {
+                    this.handle1.setAttribute('transform', `translate(${x1}, ${y1 + offset}) rotate(-90)`);
+                    this.handle2.setAttribute('transform', `translate(${x2}, ${y2 - offset}) rotate(90)`);
+                    console.log("Ребро вертикальное: handle1 поворачивается на -90 градусов, handle2 на 90");
+                }
+            } else {
+                if (x1 < x2) {
+                    this.handle1.setAttribute('transform', `translate(${x1 - offset}, ${y1}) rotate(0)`);
+                    this.handle2.setAttribute('transform', `translate(${x2 + offset}, ${y2}) rotate(180)`);
+                    console.log("Ребро горизонтальное: handle1 без поворота, handle2 на 180 градусов");
+                } else {
+                    this.handle1.setAttribute('transform', `translate(${x1 + offset}, ${y1}) rotate(180)`);
+                    this.handle2.setAttribute('transform', `translate(${x2 - offset}, ${y2}) rotate(0)`);
+                    console.log("Ребро горизонтальное: handle1 на 180 градусов, handle2 без поворота");
+                }
+            }
+        }
     }
 
     initDragEvents() {
@@ -570,31 +1147,38 @@ class Edge {
     }
 
     dragEdge(event) {
+        
         const dx = event.clientX - this.dragStart.x;
         const dy = event.clientY - this.dragStart.y;
 
-        const newX1 = parseFloat(this.element.getAttribute('x1')) + dx;
-        const newY1 = parseFloat(this.element.getAttribute('y1')) + dy;
-        const newX2 = parseFloat(this.element.getAttribute('x2')) + dx;
-        const newY2 = parseFloat(this.element.getAttribute('y2')) + dy;
+        const newX1 = parseFloat(this.element.getAttribute('points').split(' ')[0].split(',')[0]) + dx;
+        const newY1 = parseFloat(this.element.getAttribute('points').split(' ')[0].split(',')[1]) + dy;
+        const newX2 = parseFloat(this.element.getAttribute('points').split(' ')[3].split(',')[0]) + dx;
+        const newY2 = parseFloat(this.element.getAttribute('points').split(' ')[3].split(',')[1]) + dy;
 
         this.setStandalonePosition(newX1, newY1, newX2, newY2);
         this.dragStart = { x: event.clientX, y: event.clientY };
     }
 
     dragHandle(event) {
-        const newX = event.clientX;
-        const newY = event.clientY;
+        const parent_rect = this.graph.wrapper.getBoundingClientRect();
+        const newX = event.clientX - parent_rect.left;
+        const newY = event.clientY - parent_rect.top;
 
         if (this.draggingHandle === this.handle1) {
+            console.log("поинтс", newX,newY,parseFloat(this.element.getAttribute('points').split(' ')[3].split(',')[0]), parseFloat(this.element.getAttribute('points').split(' ')[3].split(',')[1]))
             this.setStandalonePosition(newX, newY,
-                parseFloat(this.element.getAttribute('x2')),
-                parseFloat(this.element.getAttribute('y2')));
+                parseFloat(this.element.getAttribute('points').split(' ')[3].split(',')[0]),
+                parseFloat(this.element.getAttribute('points').split(' ')[3].split(',')[1]));
+             this.updatePosition()
+            console.log("handle1")
         } else if (this.draggingHandle === this.handle2) {
             this.setStandalonePosition(
-                parseFloat(this.element.getAttribute('x1')),
-                parseFloat(this.element.getAttribute('y1')),
+                parseFloat(this.element.getAttribute('points').split(' ')[0].split(',')[0]),
+                parseFloat(this.element.getAttribute('points').split(' ')[0].split(',')[1]),
                 newX, newY);
+            this.updatePosition()
+            console.log("handle2")
         }
     }
 
@@ -610,11 +1194,11 @@ class Edge {
 
     handleConnectionPoints() {
         const freeEndX = this.draggingHandle === this.handle1
-            ? parseFloat(this.element.getAttribute('x1'))
-            : parseFloat(this.element.getAttribute('x2'));
+            ? parseFloat(this.element.getAttribute('points').split(' ')[0].split(',')[0])
+            : parseFloat(this.element.getAttribute('points').split(' ')[3].split(',')[0]);
         const freeEndY = this.draggingHandle === this.handle1
-            ? parseFloat(this.element.getAttribute('y1'))
-            : parseFloat(this.element.getAttribute('y2'));
+            ? parseFloat(this.element.getAttribute('points').split(' ')[0].split(',')[1])
+            : parseFloat(this.element.getAttribute('points').split(' ')[3].split(',')[1]);
 
         let foundEntity = false;
         let closestPoint = null;
@@ -650,12 +1234,15 @@ class Edge {
     bindToEntity(freeEndX, freeEndY, closestPoint, entity) {
         if (this.draggingHandle === this.handle1) {
             this.entity1 = entity;
-            this.element.setAttribute('x1', closestPoint.x);
-            this.element.setAttribute('y1', closestPoint.y);
+            this.setStandalonePosition(closestPoint.x, closestPoint.y,
+                parseFloat(this.element.getAttribute('points').split(' ')[3].split(',')[0]),
+                parseFloat(this.element.getAttribute('points').split(' ')[3].split(',')[1]));
         } else if (this.draggingHandle === this.handle2) {
             this.entity2 = entity;
-            this.element.setAttribute('x2', closestPoint.x);
-            this.element.setAttribute('y2', closestPoint.y);
+            this.setStandalonePosition(
+                parseFloat(this.element.getAttribute('points').split(' ')[0].split(',')[0]),
+                parseFloat(this.element.getAttribute('points').split(' ')[0].split(',')[1]),
+                closestPoint.x, closestPoint.y);
         }
     }
 
@@ -697,34 +1284,394 @@ class Edge {
     }
 
     updateBothEnds() {
-        const start = this.entity1.findClosestConnectionPoint(this.entity2);
-        const end = this.entity2.findClosestConnectionPoint(this.entity1);
-        this.setStandalonePosition(start.x, start.y, end.x, end.y);
+        console.log("updateBoth")
+        const { start, end } = this.entity1.findClosestConnectionPoints(this.entity2);
+        
+        if (start && end) {
+            this.setStandalonePosition(start.x, start.y, end.x, end.y);
+        }
     }
 
     updateStart() {
-        const start = this.entity1.findClosestConnectionPoint({
-            geometry: { x: this.element.getAttribute('x2'), y: this.element.getAttribute('y2'), width: 0, height: 0 }
+        console.log("updateStart")
+        const pointsString = this.element.getAttribute('points');
+        
+        const pointsArray = pointsString.split(' ').map(point => {
+            const [x, y] = point.split(',');
+            return { x: parseFloat(x), y: parseFloat(y) };
         });
+    
+        const lastPoint = pointsArray[pointsArray.length - 1];
+        console.log("lastPoint",lastPoint)
+    
+        const { start } = this.entity1.findClosestConnectionPoints({
+            geometry: { 
+                x: lastPoint.x,
+                y: lastPoint.y,
+                width: 0,
+                height: 0 
+            },
+            setConnectionPoints: function () {
+                this.connectionPoints = [{ x: lastPoint.x, y: lastPoint.y }];
+            }
+        });
+        console.log("start in updateStart",start)
+    
         this.setStandalonePosition(start.x, start.y,
-            this.element.getAttribute('x2') || 0,
-            this.element.getAttribute('y2') || 0);
+            lastPoint.x,
+            lastPoint.y);
     }
 
     updateEnd() {
-        const end = this.entity2.findClosestConnectionPoint({
-            geometry: { x: this.element.getAttribute('x1'), y: this.element.getAttribute('y1'), width: 0, height: 0 }
+        console.log("updateEnd")
+        const pointsString = this.element.getAttribute('points');
+        console.log("pointsString", pointsString);
+        console.log("entity2 connectionPoints", this.entity2.connectionPoints);
+
+        const pointsArray = pointsString.split(' ').map(point => {
+            const [x, y] = point.split(',');
+            return { x: parseFloat(x), y: parseFloat(y) };
         });
+
+        const firstPoint = pointsArray[0];
+        console.log("firstPoint", firstPoint);
+    
+        let closestPoint = null;
+        let minDistance = Infinity;
+    
+        this.entity2.setConnectionPoints()
+        for (const point2 of this.entity2.connectionPoints) {
+            const distance = this.entity2.calculateDistance(firstPoint, point2);
+            if (distance < minDistance) {
+                minDistance = distance;
+                closestPoint = point2;
+            }
+        }
+    
+        console.log("Closest point on entity2:", closestPoint);
+    
         this.setStandalonePosition(
-            this.element.getAttribute('x1') || 0,
-            this.element.getAttribute('y1') || 0,
-            end.x, end.y);
+            firstPoint.x,
+            firstPoint.y,
+            closestPoint.x, closestPoint.y
+        );
+    }  
+}
+
+const svgWrapper = document.getElementById('canvas');
+const svgContainer = document.getElementById('svgContainer');
+const graphHandler = new GraphHandler(svgWrapper,svgContainer);
+
+let identifiers = [];
+let attributes = [];
+
+document.getElementById('addEntityButton').addEventListener('click', () => {
+    const entityOptions = document.getElementById('entityOptions');
+    entityOptions.style.display = entityOptions.style.display === 'none' ? 'flex' : 'none';
+    entityOptions.style.flexDirection = 'column';
+    identifiers = [];
+    attributes = [];
+    updateIdentifiersList();
+    updateAttributesList();
+    resetEntityForm();
+});
+
+// Добавить идентификатор
+document.getElementById('addIdentifierButton').addEventListener('click', () => {
+    const identifierInput = document.getElementById('identifierInput');
+    const identifier = identifierInput.value.trim();
+    if (identifier) {
+        identifiers.push(identifier);
+        identifierInput.value = '';
+        updateIdentifiersList();
+    }
+});
+
+// Добавить атрибут
+document.getElementById('addAttributeButton').addEventListener('click', () => {
+    const attributeInput = document.getElementById('attributeInput');
+    const attribute = attributeInput.value.trim();
+    if (attribute) {
+        attributes.push(attribute);
+        attributeInput.value = '';
+        updateAttributesList();
+    }
+});
+
+
+document.getElementById('saveGraphButton').addEventListener('click', () => {
+    graphHandler.saveGraphState();  // Сохраняем граф в файл
+});
+document.getElementById('loadGraphButton').addEventListener('click', () => {
+    document.getElementById('fileInput').click();
+});
+
+document.getElementById('fileInput').addEventListener('change', (event) => {
+    const file = event.target.files[0];
+    if (file) {
+        // const graphHandler = new GraphHandler(document.getElementById('svgContainer')); // Adjust container
+        graphHandler.loadState(file);
+    }
+});
+
+function updateIdentifiersList() {
+    const identifiersList = document.getElementById('identifiersList');
+    identifiersList.innerHTML = '';
+    identifiers.forEach(identifier => {
+        const item = document.createElement('div');
+        item.textContent = identifier;
+        identifiersList.appendChild(item);
+    });
+}
+
+function updateAttributesList() {
+    const attributesList = document.getElementById('attributesList');
+    attributesList.innerHTML = '';
+    attributes.forEach(attribute => {
+        const item = document.createElement('div');
+        item.textContent = attribute;
+        attributesList.appendChild(item);
+    });
+}
+
+document.getElementById('createEntityButton').addEventListener('click', () => {
+    const selectedType = document.querySelector('input[name="entityType"]:checked').value;
+    const isStrong = selectedType === 'strong';
+    const isRelational = document.getElementById('isRelationalCheckbox').checked;
+    const entityName = document.getElementById('entityNameInput').value || 'New Entity';
+
+    const centerX = svgContainer.clientWidth / 2;
+    const centerY = svgContainer.clientHeight / 2;
+    const newEntity = new Entity(graphHandler, entityName, centerX - 60, centerY - 30, 120, 60, isStrong, isRelational);
+    
+    identifiers.forEach(id => newEntity.addElement(id, true));
+    attributes.forEach(attr => newEntity.addElement(attr, false));
+    
+    graphHandler.addEntity(newEntity);
+
+    document.getElementById('entityOptions').style.display = 'none';
+    identifiers = [];
+    attributes = [];
+    updateIdentifiersList();
+    updateAttributesList();
+});
+document.getElementById('attributeTypeSelect').addEventListener('change', (event) => {
+    const lengthInputContainer = document.getElementById('lengthInputContainer');
+    const selectedType = event.target.value;
+    
+    if (selectedType === 'int' || selectedType === 'nvarchar') {
+        lengthInputContainer.style.display = 'block';
+    } else {
+        lengthInputContainer.style.display = 'none';
+    }
+});
+
+
+let selectedEntity = null;
+
+function displaySelectedEntityData(entity) {
+    selectedEntity = entity;
+    const selectedEntityData = document.getElementById('selectedEntityData');
+    selectedEntityData.style.display = 'flex';
+    selectedEntityData.style.flexDirection = 'column';
+    selectedEntityData.style.alignItems = 'center';
+
+    const entityNameInput = document.getElementById('selectedEntityNameInput');
+    entityNameInput.value = entity.label;
+    entityNameInput.addEventListener('input', (event) => {
+        selectedEntity.label = event.target.value;
+        selectedEntity.updateTextPosition();
+    });
+
+    const selectedIdentifiersList = document.getElementById('selectedIdentifiersList');
+    const selectedAttributesList = document.getElementById('selectedAttributesList');
+    selectedIdentifiersList.innerHTML = '<h5>Identifiers</h5>';
+    selectedAttributesList.innerHTML = '<h5>Attributes</h5>';
+
+    const relationalAttributes = document.getElementById('relationalAttributes');
+    if (entity.isRelational) {
+        relationalAttributes.style.display = 'flex';
+    } else {
+        relationalAttributes.style.display = 'none';
+    }
+
+    entity.attributes.forEach((attr, index) => {
+        if (attr.isIdentifier) {
+            const item = createEditableItem(attr, (updatedAttr) => {
+                entity.attributes[index] = updatedAttr;
+                entity.updateAttributesOnCanvas();
+            }, entity); 
+            selectedIdentifiersList.appendChild(item);
+        }
+    });
+
+    entity.attributes.forEach((attr, index) => {
+        if (!attr.isIdentifier) {
+            const item = createEditableItem(attr, (updatedAttr) => {
+                entity.attributes[index] = updatedAttr;
+                entity.updateAttributesOnCanvas();
+            }, entity);  
+            selectedAttributesList.appendChild(item);
+        }
+    });
+}
+
+function createEditableItem(attr, onSave, entity) {
+    const container = document.createElement('div');
+    
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = attr.name;
+    container.appendChild(input);
+
+    if (entity.isRelational) {
+        const isNullCheckbox = document.createElement('input');
+        isNullCheckbox.type = 'checkbox';
+        isNullCheckbox.checked = attr.isNull;
+        isNullCheckbox.addEventListener('change', () => {
+            attr.isNull = isNullCheckbox.checked;
+            onSave(attr);
+        });
+        container.appendChild(document.createTextNode(' Is Null '));
+        container.appendChild(isNullCheckbox);
+
+        const isForeignKeyCheckbox = document.createElement('input');
+        isForeignKeyCheckbox.type = 'checkbox';
+        isForeignKeyCheckbox.checked = attr.isForeignKey;
+        isForeignKeyCheckbox.addEventListener('change', () => {
+            attr.isForeignKey = isForeignKeyCheckbox.checked;
+            onSave(attr);
+        });
+        container.appendChild(document.createTextNode(' Foreign Key '));
+        container.appendChild(isForeignKeyCheckbox);
+
+        const typeSelect = document.createElement('select');
+        const typeOptions = ['int', 'nvarchar', 'money'];
+        typeOptions.forEach(type => {
+            const option = document.createElement('option');
+            option.value = type;
+            option.textContent = type.toUpperCase();
+            if (attr.type === type) {
+                option.selected = true;
+            }
+            typeSelect.appendChild(option);
+        });
+        typeSelect.addEventListener('change', () => {
+            attr.type = typeSelect.value;
+            onSave(attr);
+            updateLengthInputVisibility(attr.type);
+        });
+        container.appendChild(document.createTextNode(' Type: '));
+        container.appendChild(typeSelect);
+
+        const lengthInputContainer = document.createElement('div');
+        lengthInputContainer.id = 'lengthInputContainer';
+        lengthInputContainer.style.display = (attr.type === 'int' || attr.type === 'nvarchar') ? 'block' : 'none';
+
+        const lengthLabel = document.createElement('label');
+        lengthLabel.setAttribute('for', 'attributeLength');
+        lengthLabel.textContent = 'Length:';
+        lengthInputContainer.appendChild(lengthLabel);
+
+        const lengthInput = document.createElement('input');
+        lengthInput.type = 'number';
+        lengthInput.id = 'attributeLength';
+        lengthInput.placeholder = 'Length (for int, nvarchar)';
+        lengthInput.value = attr.length || '';
+        lengthInput.addEventListener('input', () => {
+            attr.length = lengthInput.value;
+            onSave(attr);
+        });
+        lengthInputContainer.appendChild(lengthInput);
+
+        container.appendChild(lengthInputContainer);
+    }
+
+    input.addEventListener('input', () => {
+        attr.name = input.value;
+        onSave(attr);
+    });
+
+    return container;
+}
+
+function updateLengthInputVisibility(type) {
+    const lengthInputContainer = document.getElementById('lengthInputContainer');
+    if (lengthInputContainer) {
+        lengthInputContainer.style.display = (type === 'int' || type === 'nvarchar') ? 'block' : 'none';
     }
 }
 
+document.getElementById('addNewIdentifierButton').addEventListener('click', () => {
+    const newIdentifierInput = document.getElementById('newIdentifierInput');
+    const newIdentifier = newIdentifierInput.value.trim();
+    if (newIdentifier && selectedEntity) {
+        selectedEntity.addElement(newIdentifier, true);
+        displaySelectedEntityData(selectedEntity);
+        newIdentifierInput.value = '';
+    }
+});
+
+document.getElementById('addNewAttributeButton').addEventListener('click', () => {
+    const newAttributeInput = document.getElementById('newAttributeInput');
+    const newAttributeName = newAttributeInput.value.trim();
+    
+    const isNull = document.getElementById('isNull').checked; 
+    const isForeignKey = document.getElementById('isForeignKey').checked;
+    const attributeType = document.getElementById('attributeTypeSelect').value;  
+    const length = document.getElementById('attributeLength').value.trim(); 
+
+    if (newAttributeName && selectedEntity) {
+        selectedEntity.addElement(newAttributeName, false, isNull, isForeignKey, attributeType, length);
+        
+        displaySelectedEntityData(selectedEntity); 
+        
+        newAttributeInput.value = ''; 
+        document.getElementById('attributeLength').value = '';  
+    }
+});
+
+
+
+document.getElementById('selectedEntityNameInput').addEventListener('input', (event) => {
+    if (selectedEntity) {
+        selectedEntity.label = event.target.value;
+        selectedEntity.updateTextPosition(); 
+    }
+});
+
+
+function resetEntityForm() {
+    document.getElementById('identifiersList').innerHTML = '';
+    document.getElementById('attributesList').innerHTML = '';
+    document.getElementById('identifierInput').value = '';
+    document.getElementById('attributeInput').value = '';
+    document.getElementById('entityNameInput').value = ''; 
+}
+
+function clearSelectedEntityData() {
+    selectedEntity = null;
+    document.getElementById('selectedEntityData').style.display = 'none';
+    document.getElementById('selectedIdentifiersList').innerHTML = '';
+    document.getElementById('selectedAttributesList').innerHTML = '';
+}
+
+document.getElementById('addEdgeButton').addEventListener('click', () => {
+    const svgWidth = svgContainer.clientWidth;
+    const svgHeight = svgContainer.clientHeight;
+
+    const randomX1 = Math.floor(Math.random() * svgWidth);
+    const randomY1 = Math.floor(Math.random() * svgHeight);
+    const randomX2 = Math.floor(Math.random() * svgWidth);
+    const randomY2 = Math.floor(Math.random() * svgHeight);
+
+    graphHandler.addEdgeStandalone(randomX1, randomY1, randomX2, randomY2);
+});
+
+
 
 //////////////// пример работы /////////////////
-const svgContainer = document.getElementById('svgContainer');
+/*const svgContainer = document.getElementById('svgContainer');
 const graphHandler = new GraphHandler(svgContainer);
 
 const entity1 = new Entity(graphHandler, 'Entity1', 400, 30, 50, 50);
@@ -756,3 +1703,4 @@ document.getElementById('addEdgeButton').addEventListener('click', () => {
     graphHandler.addEdgeStandalone(randomX1, randomY1, randomX2, randomY2);
 });
 
+*/
