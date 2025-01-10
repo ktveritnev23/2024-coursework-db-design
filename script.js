@@ -438,19 +438,7 @@ class GraphHandler {
         this.container.addEventListener('click', () => this.selectionModel.deselect());
     }
 
-    logCells() {
-        console.log(`Total entities in the graph: ${this.cells.length}`);
-        // this.cells.forEach((entity, index) => {
-        //     console.log(`Entity ${index + 1}:`);
-        //     console.log(`Name: ${entity.label}`);
-        //     console.log(`Position: (${entity.geometry.x}, ${entity.geometry.y})`);
-        //     console.log(`Size: ${entity.geometry.width}x${entity.geometry.height}`);
-        //     console.log(`Is Strong: ${entity.isStrong}`);
-        //     console.log(`Attributes: ${entity.attributes.map(attr => attr.name).join(', ')}`);
-        //     console.log(`Identifiers: ${entity.attributes.filter(attr => attr.isIdentifier).map(attr => attr.name).join(', ')}`);
-        // });
-    }
-    // Updated saveGraphState method
+
 saveGraphState() {
     const graphState = {
         entities: this.cells.map(entity => this.serializeEntity(entity)),
@@ -466,7 +454,6 @@ saveGraphState() {
     link.click();
 }
 
-// Serialize Entity considering new class structure
 serializeEntity(entity) {
     return {
         name: entity.label,
@@ -476,13 +463,12 @@ serializeEntity(entity) {
         height: entity.geometry.height,
         isStrong: entity.isStrong,
         isRelational: entity.isRelational,
-        attributes: entity.attributes.filter(attr => !attr.isIdentifier).map(attr => attr.name), // Regular attributes
-        identifiers: entity.attributes.filter(attr => attr.isIdentifier).map(attr => attr.name), // Identifiers
-        connectionPoints: entity.connectionPoints // Connection points
+        attributes: entity.attributes.filter(attr => !attr.isIdentifier).map(attr => attr.name), 
+        identifiers: entity.attributes.filter(attr => attr.isIdentifier).map(attr => attr.name), 
+        connectionPoints: entity.connectionPoints 
     };
 }
 
-// Serialize Edge considering new class structure
 serializeEdge(edge) {
     const pointsString = edge.element.getAttribute('points');
     const pointsArray = pointsString.split(' ').map(point => {
@@ -495,12 +481,11 @@ serializeEdge(edge) {
         entity1: edge.entity1 ? edge.entity1.label : null,
         entity2: edge.entity2 ? edge.entity2.label : null,
         points: pointsArray,
-        handle1Type: edge.handle1.dataset.type, // Handle type for handle1
-        handle2Type: edge.handle2.dataset.type  // Handle type for handle2
+        handle1Type: edge.handle1.dataset.type, 
+        handle2Type: edge.handle2.dataset.type  
     };
 }
 
-// Updated loadState method
 loadState(file) {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -509,7 +494,6 @@ loadState(file) {
             this.cells = [];
             this.edges = [];
 
-            // Load entities
             graphState.entities.forEach(entityData => {
                 const entity = new Entity(
                     this,
@@ -522,7 +506,6 @@ loadState(file) {
                     entityData.isRelational
                 );
 
-                // Load attributes and identifiers
                 entityData.identifiers.forEach(identifier => {
                     entity.addElement(identifier, true);
                 });
@@ -531,14 +514,12 @@ loadState(file) {
                     entity.addElement(attribute, false);
                 });
 
-                // Load connection points
                 entity.connectionPoints = entityData.connectionPoints;
 
                 this.cells.push(entity);
                 this.container.appendChild(entity.element);
             });
 
-            // Load edges
             graphState.edges.forEach(edgeData => {
                 let entity1 = null, entity2 = null;
 
@@ -554,7 +535,6 @@ loadState(file) {
                 edge.element.setAttribute('points', edgeData.points.map(p => `${p.x},${p.y}`).join(' '));
                 edge.updateHandles();
 
-                // Load handle types
                 edge.handle1.dataset.type = edgeData.handle1Type;
                 edge.handle2.dataset.type = edgeData.handle2Type;
 
