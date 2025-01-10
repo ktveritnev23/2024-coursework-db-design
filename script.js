@@ -450,113 +450,129 @@ class GraphHandler {
         //     console.log(`Identifiers: ${entity.attributes.filter(attr => attr.isIdentifier).map(attr => attr.name).join(', ')}`);
         // });
     }
-    saveGraphState() {
-        const graphState = {
-            entities: this.cells.map(entity => this.serializeEntity(entity)),
-            edges: this.edges.map(edge => this.serializeEdge(edge))
-        };
+    // Updated saveGraphState method
+saveGraphState() {
+    const graphState = {
+        entities: this.cells.map(entity => this.serializeEntity(entity)),
+        edges: this.edges.map(edge => this.serializeEdge(edge))
+    };
 
-        const jsonString = JSON.stringify(graphState, null, 2);
+    const jsonString = JSON.stringify(graphState, null, 2);
 
-        const blob = new Blob([jsonString], { type: 'application/json' });
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = 'graphState.json';
-        link.click();
-    }
+    const blob = new Blob([jsonString], { type: 'application/json' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'graphState.json';
+    link.click();
+}
 
-    serializeEntity(entity) {
-        return {
-            name: entity.label,
-            x: entity.geometry.x,
-            y: entity.geometry.y,
-            width: entity.geometry.width,
-            height: entity.geometry.height,
-            isStrong: entity.isStrong,
-            attributes: entity.attributes.filter(attr => !attr.isIdentifier).map(attr => attr.name), // Only regular attributes
-            identifiers: entity.attributes.filter(attr => attr.isIdentifier).map(attr => attr.name) // Only identifiers
-        };
-    }
+// Serialize Entity considering new class structure
+serializeEntity(entity) {
+    return {
+        name: entity.label,
+        x: entity.geometry.x,
+        y: entity.geometry.y,
+        width: entity.geometry.width,
+        height: entity.geometry.height,
+        isStrong: entity.isStrong,
+        isRelational: entity.isRelational,
+        attributes: entity.attributes.filter(attr => !attr.isIdentifier).map(attr => attr.name), // Regular attributes
+        identifiers: entity.attributes.filter(attr => attr.isIdentifier).map(attr => attr.name), // Identifiers
+        connectionPoints: entity.connectionPoints // Connection points
+    };
+}
 
-    serializeEdge(edge) {
-        const pointsString = edge.element.getAttribute('points');
-        const pointsArray = pointsString.split(' ').map(point => {
-            const [x, y] = point.split(',');
-            return { x: parseFloat(x), y: parseFloat(y) };
-        });
+// Serialize Edge considering new class structure
+serializeEdge(edge) {
+    const pointsString = edge.element.getAttribute('points');
+    const pointsArray = pointsString.split(' ').map(point => {
+        const [x, y] = point.split(',');
+        return { x: parseFloat(x), y: parseFloat(y) };
+    });
 
-        return {
-            isStandalone: edge.isStandalone,
-            entity1: edge.entity1 ? edge.entity1.label : null,
-            entity2: edge.entity2 ? edge.entity2.label : null,
-            points: pointsArray
-        };
-    }
+    return {
+        isStandalone: edge.isStandalone,
+        entity1: edge.entity1 ? edge.entity1.label : null,
+        entity2: edge.entity2 ? edge.entity2.label : null,
+        points: pointsArray,
+        handle1Type: edge.handle1.dataset.type, // Handle type for handle1
+        handle2Type: edge.handle2.dataset.type  // Handle type for handle2
+    };
+}
 
+// Updated loadState method
+loadState(file) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            const graphState = JSON.parse(e.target.result);
+            this.cells = [];
+            this.edges = [];
 
-    loadState(file) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            try {
-                const graphState = JSON.parse(e.target.result);
-                this.cells = [];
-                this.edges = [];
+            // Load entities
+            graphState.entities.forEach(entityData => {
+                const entity = new Entity(
+                    this,
+                    entityData.name,
+                    entityData.x,
+                    entityData.y,
+                    entityData.width,
+                    entityData.height,
+                    entityData.isStrong,
+                    entityData.isRelational
+                );
 
-                graphState.entities.forEach(entityData => {
-                    const entity = new Entity(
-                        this,
-                        entityData.name,
-                        entityData.x,
-                        entityData.y,
-                        entityData.width,
-                        entityData.height,
-                        entityData.isStrong
-                    );
-
-                    if (entityData.identifiers.length > 0) {
-                        entityData.identifiers.forEach(identifier => {
-                            entity.addElement(identifier, true);
-                        });
-                    }
-
-                    if (entityData.attributes.length > 0) {
-                        entityData.attributes.forEach(attribute => {
-                            entity.addElement(attribute, false);
-                        });
-                    }
-
-                    this.cells.push(entity);
-                    this.container.appendChild(entity.element);
+                // Load attributes and identifiers
+                entityData.identifiers.forEach(identifier => {
+                    entity.addElement(identifier, true);
                 });
 
-                graphState.edges.forEach(edgeData => {
-                    let entity1 = null, entity2 = null;
-
-                    if (edgeData.entity1) {
-                        entity1 = this.cells.find(e => e.label === edgeData.entity1);
-                    }
-                    if (edgeData.entity2) {
-                        entity2 = this.cells.find(e => e.label === edgeData.entity2);
-                    }
-
-                    const edge = new Edge(this, entity1, entity2, edgeData.isStandalone);
-
-                    edge.element.setAttribute('points', edgeData.points.map(p => `${p.x},${p.y}`).join(' '));
-                    edge.updateHandles();
-
-                    this.container.appendChild(edge.element);
-                    this.container.appendChild(edge.handle1);
-                    this.container.appendChild(edge.handle2);
-
-                    this.edges.push(edge);
+                entityData.attributes.forEach(attribute => {
+                    entity.addElement(attribute, false);
                 });
-                this.logCells();
-            } catch (err) {
-                console.error('error:', err);
-            }
-        };
-        reader.readAsText(file);
-    }
+
+                // Load connection points
+                entity.connectionPoints = entityData.connectionPoints;
+
+                this.cells.push(entity);
+                this.container.appendChild(entity.element);
+            });
+
+            // Load edges
+            graphState.edges.forEach(edgeData => {
+                let entity1 = null, entity2 = null;
+
+                if (edgeData.entity1) {
+                    entity1 = this.cells.find(e => e.label === edgeData.entity1);
+                }
+                if (edgeData.entity2) {
+                    entity2 = this.cells.find(e => e.label === edgeData.entity2);
+                }
+
+                const edge = new Edge(this, entity1, entity2, edgeData.isStandalone);
+
+                edge.element.setAttribute('points', edgeData.points.map(p => `${p.x},${p.y}`).join(' '));
+                edge.updateHandles();
+
+                // Load handle types
+                edge.handle1.dataset.type = edgeData.handle1Type;
+                edge.handle2.dataset.type = edgeData.handle2Type;
+
+                this.container.appendChild(edge.element);
+                this.container.appendChild(edge.handle1);
+                this.container.appendChild(edge.handle2);
+
+                this.edges.push(edge);
+            });
+
+            this.logCells();
+        } catch (err) {
+            console.error('Error loading state:', err);
+        }
+    };
+    reader.readAsText(file);
+}
+
     onMouseMove(event) {
         if (this.isDragging) {
             this.moveEntity(event);
